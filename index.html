@@ -6,57 +6,230 @@
     <title>Resilient Shield Simulation Game</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        /* CSS styles remain the same */
-        html, body { height: 100%; margin: 0; padding: 0; background-color: #0d1117; color: #c9d1d9; font-family: 'Roboto', sans-serif; overflow: hidden; font-size: 16px; }
+        /* Use Game2.html exact CSS */
+        html, body { 
+            height: 100%; margin: 0; padding: 0; 
+            background-color: #0d1117; 
+            color: #c9d1d9; 
+            font-family: 'Roboto', sans-serif; 
+            overflow: hidden; 
+            font-size: 16px; 
+        }
         *, *::before, *::after { box-sizing: border-box; }
-        .container { display: flex; align-items: center; justify-content: center; width: 100vw; height: calc(100vh - 70px); padding: 20px; }
-        .card { background: #161b22; box-shadow: 0 8px 24px rgba(0,0,0,0.4); border: 1px solid #30363d; border-radius: 8px; width: 100%; max-width: 1200px; height: 100%; padding: 0; /* Padding managed by JS/Wrappers */ position: relative; overflow: hidden; }
-        /* Wrapper for standard layout content scrolling */
-         .standard-content-wrapper { padding: 25px 30px; height: 100%; overflow-y: auto; position: relative; box-sizing: border-box; /* Ensure padding included in height */ }
-         .standard-content-wrapper::-webkit-scrollbar { width: 8px; }
-         .standard-content-wrapper::-webkit-scrollbar-track { background: #0d1117; border-radius: 4px; }
-         .standard-content-wrapper::-webkit-scrollbar-thumb { background-color: #30363d; border-radius: 4px; border: 2px solid #0d1117; }
-         .standard-content-wrapper::-webkit-scrollbar-thumb:hover { background-color: #58a6ff; }
-        /* Styles for Full-Bleed Media Layout */
-        .card-background-media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-color: #000; display: flex; align-items: center; justify-content: center; }
-        .card-background-media img, .card-background-media video { width: 100%; height: 100%; object-fit: contain; object-position: center center; }
-        .media-header-area { position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: 25px 30px 15px 30px; background: linear-gradient(to bottom, rgba(13, 17, 23, 0.85) 0%, rgba(13, 17, 23, 0.6) 60%, rgba(13, 17, 23, 0.0) 100%); pointer-events: none; }
+        .container { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            width: 100vw; 
+            height: calc(100vh - 70px); 
+            padding: 20px; 
+        }
+        .card { 
+            background: #161b22; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4); 
+            border: 1px solid #30363d; 
+            border-radius: 8px; 
+            width: 100%; 
+            max-width: 1200px; 
+            height: 100%; 
+            padding: 0; 
+            position: relative; 
+            overflow: hidden; 
+        }
+        .media-header-area { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            z-index: 2; 
+            padding: 25px 30px 15px 30px; 
+            background: linear-gradient(to bottom, rgba(13,17,23,0.85) 0%, rgba(13,17,23,0.6) 60%, rgba(13,17,23,0.0) 100%); 
+            pointer-events: none; 
+        }
         .media-header-area > * { pointer-events: auto; }
-        .content-overlay { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1; background-color: rgba(22, 27, 34, 0.9); border-top: 1px solid #30363d; color: #c9d1d9; padding: 20px 30px; max-height: 45%; overflow-y: auto; }
+        .content-overlay { 
+            position: absolute; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            z-index: 1; 
+            background-color: rgba(22,27,34,0.9); 
+            border-top: 1px solid #30363d; 
+            color: #c9d1d9; 
+            padding: 20px 30px; 
+            max-height: 45%; 
+            overflow-y: auto; 
+        }
         .content-overlay::-webkit-scrollbar { width: 6px; }
-        .content-overlay::-webkit-scrollbar-track { background: rgba(13, 17, 23, 0.5); border-radius: 3px; }
-        .content-overlay::-webkit-scrollbar-thumb { background-color: rgba(48, 54, 61, 0.7); border-radius: 3px; }
-        .content-overlay .scene-content { margin-bottom: 0; }
-        /* Standard elements */
-        .timeline-header { font-size: 0.9em; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #30363d; color: #8b949e; }
-        .team-info { font-size: 0.95em; margin-bottom: 20px; font-weight: 500; color: #c9d1d9; background-color: #21262d; padding: 10px 15px; border-radius: 6px; border: 1px solid #30363d; }
-        .scene-title { font-size: 1.8em; font-weight: 700; margin-bottom: 15px; color: #f0f6fc; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
-        /* scene-meta only used if you uncomment it */
-        /* .scene-meta { font-size: 0.9em; color: #8b949e; margin-bottom: 20px; } */
-        /* .scene-meta strong { color: #c9d1d9; } */
-        .scene-media-placeholder { background-color: #21262d; border: 1px dashed #444c56; padding: 40px 20px; text-align: center; margin-bottom: 20px; border-radius: 6px; color: #8b949e; font-style: italic; min-height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center;}
-        .scene-content { font-size: 1em; line-height: 1.65; margin-bottom: 25px; color: #c9d1d9; }
-        .scene-content strong { color: #f0f6fc; font-weight: 600; }
-        .poll-area { margin: 25px 0; padding: 20px; background: #21262d; border: 1px solid #30363d; border-radius: 6px; }
-        .poll-stem { font-size: 1.2em; margin-bottom: 15px; font-weight: 600; color: #f0f6fc; }
-        .poll-option { margin: 12px 0; padding: 10px; border-radius: 4px; transition: background-color 0.2s ease; }
+        .content-overlay::-webkit-scrollbar-thumb { 
+            background-color: rgba(48,54,61,0.7); 
+            border-radius: 3px; 
+        }
+        .scene-title { 
+            font-size: 1.8em; 
+            font-weight: 700; 
+            margin-bottom: 15px; 
+            color: #f0f6fc; 
+            border-bottom: 1px solid #30363d; 
+            padding-bottom: 10px; 
+        }
+        .team-info { 
+            font-size: 0.8em;  /* NEW: Reduced font size for team header */
+            margin-bottom: 20px; 
+            font-weight: 500; 
+            color: #c9d1d9; 
+            background-color: #21262d; 
+            padding: 10px 15px; 
+            border-radius: 6px; 
+            border: 1px solid #30363d; 
+        }
+        .team-info strong { color: #f0f6fc; }
+        .poll-area { 
+            margin: 12.5px 0; 
+            padding: 10px; 
+            background: #21262d; 
+            border: 1px solid #30363d; 
+            border-radius: 6px; 
+        }
+        .poll-stem { 
+            font-size: 1.2em; 
+            margin-bottom: 15px; 
+            font-weight: 600; 
+            color: #f0f6fc; 
+        }
+        .poll-option { 
+            margin: 12px 0; 
+            padding: 10px; 
+            border-radius: 4px; 
+            transition: background-color 0.2s ease; 
+        }
         .poll-option:hover { background-color: #30363d; }
-        .poll-option label { display: inline-block; margin-left: 10px; cursor: pointer; color: #c9d1d9; font-size: 0.95em; vertical-align: middle; line-height: 1.4; }
-        .poll-option input[type="checkbox"], .poll-option input[type="radio"] { vertical-align: middle; cursor: pointer; accent-color: #58a6ff; margin-right: 5px; }
-        .poll-detail { display: block; font-size: 0.85em; color: #8b949e; margin-left: 28px; font-style: italic; margin-top: 4px;}
-        .poll-timer { font-size: 1em; font-weight: 500; text-align: right; margin-bottom: 10px; color: #ff9800; }
-        .poll-submit { margin-top: 20px; padding: 10px 18px; font-size: 1em; background-color: #238636; border: 1px solid rgba(240, 246, 252, 0.1); color: #ffffff; transition: background-color 0.2s ease; }
-        .poll-submit:hover:not(:disabled) { background-color: #2ea043; border-color: rgba(240, 246, 252, 0.15); }
-        .poll-submit:disabled { background-color: #30363d; color: #8b949e; cursor: not-allowed; border-color: rgba(240, 246, 252, 0.05); }
-        .locked-message { padding: 15px 20px; background: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.4); color: #f85149; border-radius: 6px; margin: 20px 0; text-align: center; font-size: 1em; font-weight: 500; }
-        .outcome-card { background-color: #161b22; border: 1px solid #30363d; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border-radius: 6px; padding: 20px; margin: 25px auto; width: 95%; max-width: 800px; text-align: center; }
-        .outcome-graph { position: relative; width: 100%; height: 280px; margin-bottom: 15px; }
-        .outcome-graph canvas { display: block; width: 100% !important; height: 100% !important; }
-        .nav-buttons { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; background-color: #0d1117; padding: 10px 0 15px 0; border-top: 1px solid #30363d; z-index: 10; }
-        button { padding: 10px 18px; margin: 5px 10px; font-size: 1em; font-weight: 500; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease; }
-        button:hover:not(:disabled) { background: #30363d; border-color: #8b949e; }
-        button:disabled { background: #161b22; color: #444c56; border-color: #30363d; cursor: not-allowed; }
+        .poll-option label { 
+            display: inline-block; 
+            margin-left: 10px; 
+            cursor: pointer; 
+            color: #c9d1d9; 
+            font-size: 0.95em; 
+            vertical-align: middle; 
+            line-height: 1.4; 
+        }
+        .poll-option input[type="checkbox"], 
+        .poll-option input[type="radio"] { 
+            vertical-align: middle; 
+            cursor: pointer; 
+            accent-color: #58a6ff; 
+            margin-right: 5px; 
+        }
+        .poll-submit { 
+            margin-top: 20px; 
+            padding: 10px 18px; 
+            font-size: 1em; 
+            background-color: #238636; 
+            border: 1px solid rgba(240,246,252,0.1); 
+            color: #ffffff; 
+            transition: background-color 0.2s ease; 
+        }
+        .poll-submit:hover:not(:disabled) { 
+            background-color: #2ea043; 
+            border-color: rgba(240,246,252,0.15); 
+        }
+        .poll-submit:disabled { 
+            background-color: #30363d; 
+            color: #8b949e; 
+            cursor: not-allowed; 
+            border-color: rgba(240,246,252,0.05); 
+        }
+        .locked-message { 
+            padding: 15px 20px; 
+            background: rgba(248,81,73,0.1); 
+            border: 1px solid rgba(248,81,73,0.4); 
+            color: #f85149; 
+            border-radius: 6px; 
+            margin: 20px 0; 
+            text-align: center; 
+            font-size: 1em; 
+            font-weight: 500; 
+        }
+        .outcome-card { 
+            background-color: #161b22; 
+            border: 1px solid #30363d; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+            border-radius: 6px; 
+            padding: 20px; 
+            margin: 25px auto; 
+            width: 95%; 
+            max-width: 800px; 
+            text-align: center; 
+        }
+        .outcome-graph { 
+            position: relative; 
+            width: 100%; 
+            height: 300px; /* NEW: set fixed height so the plot fills the space better */
+            margin-bottom: 15px; 
+        }
+        .outcome-graph canvas { 
+            display: block; 
+            width: 100% !important; 
+            height: 100% !important; 
+        }
+        .nav-buttons { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            text-align: center; 
+            background-color: #0d1117; 
+            padding: 10px 0 15px 0; 
+            border-top: 1px solid #30363d; 
+            z-index: 10; 
+        }
+        button { 
+            padding: 10px 18px; 
+            margin: 5px 10px; 
+            font-size: 1em; 
+            font-weight: 500; 
+            background: #21262d; 
+            color: #c9d1d9; 
+            border: 1px solid #30363d; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            transition: background-color 0.2s ease, border-color 0.2s ease; 
+        }
+        button:hover:not(:disabled) { 
+            background: #30363d; 
+            border-color: #8b949e; 
+        }
+        button:disabled { 
+            background: #161b22; 
+            color: #444c56; 
+            border-color: #30363d; 
+            cursor: not-allowed; 
+        }
+        .card-background-media {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 0; 
+            background-color: #000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        .card-background-media img, .card-background-media video {
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            object-position: center center;
+        }
+        /* NEW: Ensure scene text appears above background */
+        .scene-text {
+            position: relative;
+            z-index: 3;
+        }
     </style>
 </head>
 <body>
@@ -72,275 +245,925 @@
         // ========================================================================
         // == 1. CONFIGURATION & GLOBAL STATE ==
         // ========================================================================
-        const AIRTABLE_CONFIG = { BASE_ID: "appSv8IBMvMUGt9tW", SCENES_TABLE_ID: "tblZTl0sj3EY5fXyN", POLLCHOICES_TABLE_ID: "tblYyLyxEiVICTyMY", API_TOKEN: "patN112ttphR3LZHS.63a6db52e35aa08a632d5001433b18527b27940e08fd69eda01781c9b34697a8"}; // !!! REPLACE TOKEN !!!
-        let modelParameters = { human: { vaccine_uptake: 0.05, vaccine_breakthrough: 0.1, vaccine_duration: 180, mask_compliance: 0.5, isolation_rate: 0.5, mild_test_rate: 0.2, base_contact_rate: 10, ct_compliance: 0.5, en_compliance: 0.5, therapeutic_coverage: 0.3, tripledemic_burden: 0.1 }, animal: { h5n1_poultry_vaccine_uptake: 0.1, h5n1_poultry_testing_rate: 0.15, h5n1_poultry_culling_rate: 0.05, h5nx_testing_rate: 0.05, h5nx_isolation_rate: 0.0, h5nx_culling_rate: 0.0, h5nx_livestock_vaccine_uptake: 0.0 }, info: { fact_checking: 0.3, debunking: 0.3, network_modification: 0.3, community_boost: 1.5, public_anxiety_multiplier: 1.0 } };
-        let simulationState = { testingSuccessful: false, sequencingSuccessful: false, vaccineDeveloped: false, distributionSuccessful: false, sequencingPartnership: false, h5nxVaccineFeasibilityStarted: false, h5nxPOCTestDeveloped: false };
-        const teams = [ { name: "Region I (New England)", capacities: { testingCapacity: 3, scienceCapacity: 2, publicHealthCapacity: 8, developmentCapacity: 2 }, finances: { system: 7, personal: 4 }, socialCapital: 6 }, { name: "Region II (NY/NJ & PR)", capacities: { testingCapacity: 4, scienceCapacity: 3, publicHealthCapacity: 7, developmentCapacity: 3 }, finances: { system: 9, personal: 5 }, socialCapital: 6 }, { name: "Region III (Mid-Atlantic)", capacities: { testingCapacity: 3, scienceCapacity: 4, publicHealthCapacity: 7, developmentCapacity: 3 }, finances: { system: 7, personal: 4 }, socialCapital: 7 }, { name: "Region IV (Southeast)", capacities: { testingCapacity: 4, scienceCapacity: 3, publicHealthCapacity: 6, developmentCapacity: 3 }, finances: { system: 6, personal: 3 }, socialCapital: 8 }, { name: "Region V (Midwest/Great Lakes)", capacities: { testingCapacity: 5, scienceCapacity: 4, publicHealthCapacity: 8, developmentCapacity: 4 }, finances: { system: 7, personal: 5 }, socialCapital: 8 }, { name: "Region VI (South Central)", capacities: { testingCapacity: 3, scienceCapacity: 3, publicHealthCapacity: 6, developmentCapacity: 2 }, finances: { system: 7, personal: 4 }, socialCapital: 7 }, { name: "Region VII (Central Plains)", capacities: { testingCapacity: 2, scienceCapacity: 2, publicHealthCapacity: 7, developmentCapacity: 2 }, finances: { system: 5, personal: 3 }, socialCapital: 8 }, { name: "Region VIII (Mountain)", capacities: { testingCapacity: 2, scienceCapacity: 2, publicHealthCapacity: 7, developmentCapacity: 2 }, finances: { system: 5, personal: 3 }, socialCapital: 8 }, { name: "Region IX (Pacific Coast)", capacities: { testingCapacity: 4, scienceCapacity: 4, publicHealthCapacity: 8, developmentCapacity: 4 }, finances: { system: 8, personal: 5 }, socialCapital: 7 }, { name: "Region X (Pac. NW & Alaska)", capacities: { testingCapacity: 3, scienceCapacity: 3, publicHealthCapacity: 8, developmentCapacity: 2 }, finances: { system: 7, personal: 4 }, socialCapital: 7 } ];
-        let currentTeamIndex = 0;
-        let currentTeam = teams[currentTeamIndex]; // ASSIGNMENT RESTORED
-        console.log("Global Scope: Initial currentTeam value:", JSON.stringify(currentTeam)); // DEBUG
-        let gameStartTime = null; let currentSceneIndex = 0; let totalScenes = 0; let sceneDataCache = {}; let timelineData = { totalActs: 0 };
-        window.currentChart = null; window.currentChart1 = null; window.currentChart2 = null;
-        let countdownInterval = null; // Single global declaration
-
-        // ========================================================
-        // == 2. HELPER FUNCTION DEFINITIONS ==
-        // ========================================================
-        function computeTimeline(allScenesData) { /* ... Same robust logic ... */ const acts={totalActs:0};let e=-1;if(!allScenesData||0===allScenesData.length)return console.warn("Cannot compute timeline - scene data not available."),acts;return allScenesData.forEach(t=>{const n=t.fields;if("number"!=typeof n?.SceneID){console.warn(`Scene record ${t.id} missing valid SceneID field. Skipping.`);return}if("number"!=typeof n?.Act||n.Act<0)return;const a=n.Act;acts[a]||(acts[a]={count:0,scenes:[]}),acts[a].count++,acts[a].scenes.push(n.SceneID),a>e&&(e=a)}),acts.totalActs=e+1,console.log("Timeline data computed:",acts),acts}
-        function applyCosts(choiceFields) { /* ... Same logic ... */ if(!choiceFields)return!0;let c=!0;if(choiceFields.Cost!==null&&choiceFields.Cost!==void 0&&choiceFields.Cost!==0){if(choiceFields.Cost>0){if(currentTeam.finances.system>=choiceFields.Cost){currentTeam.finances.system-=choiceFields.Cost;console.log(`Cost: ${choiceFields.Cost}M. Rem: ${currentTeam.finances.system}M`);}else{console.warn(`Insuff funds`);alert(`Action requires ${choiceFields.Cost}M. Have ${currentTeam.finances.system}M.`);c=!1;}}else{currentTeam.finances.system-=choiceFields.Cost;console.log(`Gain: ${-choiceFields.Cost}M. New: ${currentTeam.finances.system}M`);}}if(c&&choiceFields.SC!==null&&choiceFields.SC!==void 0&&choiceFields.SC!==0){currentTeam.socialCapital=Math.max(0,Math.min(10,currentTeam.socialCapital+choiceFields.SC));console.log(`SC change: ${choiceFields.SC}. New: ${currentTeam.socialCapital}`);}return c; }
-        function checkTestingSuccess() { /* ... Same logic ... */ if(!simulationState.testingSuccessful&&(currentTeam?.capacities?.testingCapacity??0)>=5){simulationState.testingSuccessful=true;console.log("--- WIN STATE PREREQ MET: Testing Capacity >= 5 ---");}}
-        function generatePlaceholderChartData(sceneData) { /* ... Same logic ... */ if(!sceneData||!sceneData.fields)return null;const scene=sceneData.fields;let t=scene.ChartType||"bar",e,a=scene.MediaNotes||scene.Title||"Chart Data";if(scene.WidgetType==="Leaderboard"){t="bar";const o=[...teams].sort((t,e)=>(e.socialCapital+e.finances.system)-(t.socialCapital+t.finances.system)),l=simulationState.testingSuccessful&&simulationState.sequencingSuccessful&&simulationState.vaccineDeveloped&&simulationState.distributionSuccessful;e={labels:o.map(t=>t.name.match(/\((.*?)\)/)?.[1]||t.name),datasets:[{label:"Overall Score (Example)",data:o.map(t=>Math.max(10,(t.socialCapital*5)+(t.finances.system*3)+Math.floor(Math.random()*20))+(l?50:0)),backgroundColor:["#2ea043","#58a6ff","#db617e","#a371f7","#f78166","#d29922","#4caf50","#2196F3","#E91E63","#9C27B0"],borderColor:"#30363d",borderWidth:1}]};a=scene.Title||"Final Team Scores (Example)"}else if(t==="line"){let o=[];if(scene.Title?.includes("Hospital Burden")||scene.Title?.includes("Containment")||scene.Title?.includes("Strain")){o=[{label:"Human Tripledemic Burden",data:[10,20,60,75,Math.min(100,modelParameters.human.tripledemic_burden*100+Math.floor(Math.random()*10))],borderColor:"#f85149",tension:.1,fill:!1},{label:"H5NX Livestock Cases (Est.)",data:[0,0,10,40,Math.min(100,30+(modelParameters.animal.h5nx_testing_rate||0)*100)],borderColor:"#f78166",tension:.1,fill:!1}];a="Health Systems Strain"}else if(scene.Title?.includes("Trust")||scene.Title?.includes("Sentiment")||scene.Title?.includes("Awareness")){o=[{label:"Public Trust Index",data:[60,65,55,60,Math.max(20,Math.min(95,(currentTeam?.socialCapital ?? 0)*8+Math.floor(Math.random()*20)-10))],borderColor:"#4CAF50",tension:.1,fill:!1},{label:"H5NX Awareness/Clarity",data:[5,10,15,30,Math.max(10,Math.min(90,modelParameters.info.fact_checking*100+modelParameters.info.debunking*50))],borderColor:"#a371f7",tension:.1,fill:!1}];a="Public Sentiment & Awareness"}else if(scene.Title?.includes("Economic")||scene.Title?.includes("Stability")){o=[{label:"Economic Strain Index",data:[20,25,50,70,Math.max(10,Math.min(90,80-(currentTeam?.finances?.system ?? 0)*4+Math.floor(Math.random()*20)))],borderColor:"#58a6ff",tension:.1,fill:!1},{label:"Food Security Index",data:[90,85,75,70,Math.max(30,Math.min(95,65+(currentTeam?.finances?.system ?? 0)*2+Math.floor(Math.random()*15)))],borderColor:"#2ea043",tension:.1,fill:!1}];a="Economic & Stability Indicators"}else{o=[{label:"Overall Preparedness",data:[60,65,55,60,Math.floor(Math.random()*50)+25],borderColor:"#4CAF50",tension:.1,fill:!1},{label:"Resource Level",data:[70,68,60,55,Math.max(10,(currentTeam?.finances?.system ?? 0)*5)],borderColor:"#58a6ff",tension:.1,fill:!1}];a="General Outcome Trends"}e={labels:["Start","Act 1","Act 2","Act 3","Now"],datasets:o}}else if(t==="pie"){let o=sceneData.fetchedPollChoices?.map(c=>c.fields.ChoiceText.substring(0,25)+(c.fields.ChoiceText.length>25?"...":""))||["Option A","Option B"];o=o.filter(t=>!t.toLowerCase().includes("distractor")),o.length===0&&(o=["N/A"]),e={labels:o,datasets:[{data:o.map(()=>Math.floor(Math.random()*30)+10),backgroundColor:["#2ea043","#58a6ff","#db617e","#a371f7","#f78166","#d29922"].slice(0,o.length),borderColor:"#161b22",borderWidth:2}]},a=scene.Title||"Distribution / Sentiment"}else{e={labels:["Testing Cap","Science Cap","PH Cap","Dev Cap","System Funds","Social Cap"],datasets:[{label:`${currentTeam?.name ?? 'N/A'} Resources`,data:[currentTeam?.capacities?.testingCapacity ?? 0,currentTeam?.capacities?.scienceCapacity ?? 0,currentTeam?.capacities?.publicHealthCapacity ?? 0,currentTeam?.capacities?.developmentCapacity ?? 0,currentTeam?.finances?.system ?? 0,currentTeam?.socialCapital ?? 0],backgroundColor:["#a371f7","#2196F3","#f85149","#ff9800","#58a6ff","#4CAF50"],borderColor:"#30363d",borderWidth:1}]},a=scene.Title||"Current Regional Capacities"}return{type:t,data:e,title:a}}
-        function getConditionFunction(logicKey) { /* ... Same logic ... */ if(!logicKey||typeof logicKey!=="string"||logicKey.toLowerCase()==="none")return()=>!0;if(logicKey===!1||logicKey.toUpperCase()==='FALSE'){console.log(`Condition logic key "${logicKey}" evaluated as always false.`);return()=>!1;}const t={"TestingCapacity>=5":()=>(currentTeam?.capacities?.testingCapacity??0)>=5,SequencingSuccessful:()=>simulationState.sequencingSuccessful,VaccineDeveloped:()=>simulationState.vaccineDeveloped,DistributionSuccessful:()=>simulationState.distributionSuccessful,"TestingSuccessful AND SequencingSuccessful AND VaccineDeveloped AND DistributionSuccessful":()=>simulationState.testingSuccessful&&simulationState.sequencingSuccessful&&simulationState.vaccineDeveloped&&simulationState.distributionSuccessful,"!(TestingSuccessful AND SequencingSuccessful AND VaccineDeveloped AND DistributionSuccessful)":()=>!(simulationState.testingSuccessful&&simulationState.sequencingSuccessful&&simulationState.vaccineDeveloped&&simulationState.distributionSuccessful),SequencingPartnership:()=>simulationState.sequencingPartnership,h5nxVaccineFeasibilityStarted:()=>simulationState.h5nxVaccineFeasibilityStarted,"ScienceCap>=4":()=>(currentTeam?.capacities?.scienceCapacity??0)>=4,"ScienceCap>=3":()=>(currentTeam?.capacities?.scienceCapacity??0)>=3,"DevCap<3":()=>(currentTeam?.capacities?.developmentCapacity??0)<3,"DevCap>=2":()=>(currentTeam?.capacities?.developmentCapacity??0)>=2,"DevCap>=3":()=>(currentTeam?.capacities?.developmentCapacity??0)>=3,"SocialCap>=7":()=>(currentTeam?.socialCapital??0)>=7,"SequencingSuccessful AND !h5nxVaccineFeasibilityStarted AND DevCap>=2":()=>simulationState.sequencingSuccessful&&!simulationState.h5nxVaccineFeasibilityStarted&&(currentTeam?.capacities?.developmentCapacity??0)>=2,"SequencingSuccessful AND ScienceCap>=4":()=>simulationState.sequencingSuccessful&&(currentTeam?.capacities?.scienceCapacity??0)>=4,"SequencingPartner+SciCap>=3":()=>simulationState.sequencingPartnership&&(currentTeam?.capacities?.scienceCapacity??0)>=3,"TestingCapacity>=5 AND !SequencingSuccessful":()=>(currentTeam?.capacities?.testingCapacity??0)>=5&&!simulationState.sequencingSuccessful};if(t.hasOwnProperty(logicKey)){return t[logicKey]}else{console.warn(`Unknown condition logic key found: "${logicKey}". Defaulting to FALSE.`);return()=>!1}}
-        function getUnlockConditionDescription(logicKey) { /* ... Same logic ... */ if(!logicKey||typeof logicKey!=="string"||logicKey.toLowerCase()==="none")return"None";if(logicKey===!1||"FALSE"===logicKey.toUpperCase())return"Condition Not Met";return logicKey.replace(/AND/g," AND ").replace(/OR/g," OR ").replace("!","NOT ").replace(">=="," >= ").replace("<"," < ").replace(">="," >= ")}
-
-
-        // ========================================================
-        // == 3. ACTION MAPPINGS ==
-        // ========================================================
-        const actionPollMapping = { /* ... Same full mapping with null checks ... */
-             // Act 0
-             "Bolster human public health infrastructure (Hospitals, Staffing)": function(choiceFields) { if(currentTeam) currentTeam.capacities.publicHealthCapacity += 1; console.log("Initial Focus: PH Capacity +1"); },
-             "Strengthen economic supports and supply chain resilience": function(choiceFields) { if(currentTeam) currentTeam.finances.system += 1; console.log("Initial Focus: System Finances +1M"); },
-             "Invest in advanced scientific surveillance and research capabilities": function(choiceFields) { if(currentTeam) currentTeam.capacities.scienceCapacity += 1; console.log("Initial Focus: Science Capacity +1"); },
-             "Enhance animal health surveillance and biosecurity measures": function(choiceFields) { if(currentTeam) currentTeam.capacities.testingCapacity += 1; checkTestingSuccess(); console.log("Initial Focus: Testing Capacity +1"); },
-             "Focus on cross-sector coordination and public communication channels": function(choiceFields) { if(currentTeam) currentTeam.socialCapital += 1; console.log("Initial Focus: Social Capital +1"); },
-             // Act 1
-             "Boost Hospital Surge Capacity (Staffing/Beds)": function(choiceFields) { if(currentTeam) currentTeam.capacities.publicHealthCapacity += 1; console.log("Invested in Hospital Surge Capacity (+1 PH Cap)."); },
-             "Enhance Regional Lab Network (Human Resp. Virus Testing)": function(choiceFields) { console.log("Enhanced Human Lab Network."); },
-             "Strengthen Poultry Farm Biosecurity Audits & Support": function(choiceFields) { modelParameters.animal.h5n1_poultry_testing_rate = Math.min(1.0, (modelParameters.animal.h5n1_poultry_testing_rate || 0) + 0.05); console.log("Strengthened Poultry Biosecurity."); },
-             "Establish University Partnership (Advanced Genomics/Modeling)": function(choiceFields) { if(currentTeam) currentTeam.capacities.scienceCapacity += 1; simulationState.sequencingPartnership = true; console.log("Established University Sequencing Partnership (+1 Sci Cap)."); },
-             "Fund Expanded Livestock Health Monitoring Network (Vets/Farmers)": function(choiceFields) { if(currentTeam) currentTeam.capacities.testingCapacity += 1; modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.05); checkTestingSuccess(); console.log("Expanded Livestock Health Monitoring (+1 Test Cap)."); },
-             "Develop Unified Public Comms Campaign (Tripledemic & Avian Flu Risks)": function(choiceFields) { modelParameters.info.fact_checking = Math.min(1.0, (modelParameters.info.fact_checking || 0) + 0.05); console.log("Developed Unified Comms Campaign."); },
-             "Aggressive Investment: +3 Animal Testing Capacity (Focused effort)": function(choiceFields) { if(currentTeam) currentTeam.capacities.testingCapacity += choiceFields.CapacityIncrease || 3; modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.1); checkTestingSuccess(); console.log(`Animal Testing capacity focus +3`); },
-             "Moderate Investment: +1 Animal Testing Capacity (Targeted boost)": function(choiceFields) { if(currentTeam) currentTeam.capacities.testingCapacity += choiceFields.CapacityIncrease || 1; modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.05); checkTestingSuccess(); console.log(`Animal Testing capacity focus +1`); },
-             "No Further Investment in Animal Testing at this time": function(choiceFields) { console.log("Chose not to invest further in animal testing."); },
-             // Act 2
-             "Request Federal Aid for Hospital Staffing/Supplies (Human Focus)": function(choiceFields) { console.log("Requesting federal aid for tripledemic."); },
-             "Expand Public Access to COVID/Flu/RSV Testing & Treatment (Human Focus)": function(choiceFields) { modelParameters.human.mild_test_rate = Math.min(1.0, modelParameters.human.mild_test_rate + 0.1); modelParameters.human.therapeutic_coverage = Math.min(1.0, modelParameters.human.therapeutic_coverage + 0.05); console.log("Expanded human respiratory testing/treatment.");},
-             "Implement Regional Mask Advisory/Mandate (Human Focus, Risk SC)": function(choiceFields) { modelParameters.human.mask_compliance = Math.min(1.0, modelParameters.human.mask_compliance + 0.1); console.log("Implemented mask advisory/mandate."); },
-             "Strict Quarantine & Enhanced Biosecurity on Affected Livestock Farms (Animal Focus)": function(choiceFields){ modelParameters.animal.h5nx_isolation_rate = Math.min(1.0, (modelParameters.animal.h5nx_isolation_rate || 0) + 0.15); console.log("Implemented strict H5NX quarantine."); },
-             "Deploy State Vet Teams for Intensive H5NX Investigation (Sampling, Necropsies) (Animal Focus)": function(choiceFields){ modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.15); if (!simulationState.sequencingSuccessful && (currentTeam?.capacities?.testingCapacity??0) >= 4 && (currentTeam?.capacities?.scienceCapacity??0) >= 3) { simulationState.sequencingSuccessful = true; console.log("Intensive investigation + High Capacity yields EARLY H5NX Sequencing Success!"); } else { console.log("Deployed vet teams for H5NX investigation."); } },
-             "Fund University Partner for Rapid H5NX Genome Sequencing (Animal Focus, Req Partner + Sci Cap >= 3)": function(choiceFields){ if (simulationState.sequencingPartnership && (currentTeam?.capacities?.scienceCapacity??0) >= 3) { simulationState.sequencingSuccessful = true; console.log("Funded emergency H5NX sequencing via partner. EARLY H5NX Sequencing Success!"); return true; } else { console.warn("Sequencing partner activation failed: Prerequisites not met."); alert("Action Failed: Requires established Partnership AND Science Capacity >= 3."); return false; } },
-             "Launch Unified Comms: Tripledemic Precautions & Animal Health Updates (Dual Focus)": function(choiceFields) { modelParameters.info.community_boost = Math.min(2.0, modelParameters.info.community_boost + 0.05); console.log("Launched unified comms."); },
-              // Act 3
-              "Focus on Animal Health Threat: Emphasize H5NX impact on livestock/agriculture, downplay human risk for now.": function(choiceFields){ modelParameters.info.public_anxiety_multiplier = 0.8; console.log("Aligned with Preprint A (Low Human Risk for H5NX)."); },
-              "Acknowledge Low Current Human Risk: State clearly that H5NX is currently an animal issue but monitoring is ongoing.": function(choiceFields){ modelParameters.info.public_anxiety_multiplier = 1.0; console.log("Acknowledged both H5NX preprints."); },
-              "Highlight Potential Long-Term Human Risk: Communicate the 'One Health' perspective – threat to animals now, potential future threat to humans.": function(choiceFields){ modelParameters.info.public_anxiety_multiplier = 1.3; console.log("Aligned with Preprint B (Potential Human Risk for H5NX)."); },
-              "Delay Specific H5NX Comms: Avoid detailed public statements until scientific consensus emerges.": function(choiceFields){ console.log("Delayed specific H5NX comms."); },
-              "Launch dedicated Multi-Threat Info Hub website & hotline (Tripledemic & H5NX)": function(choiceFields){ modelParameters.info.fact_checking = Math.min(1.0, (modelParameters.info.fact_checking || 0) + 0.1); console.log("Launched Myth vs. Fact campaign."); },
-              "Run Proactive Fact-Checking Partnership with local/national media outlets": function(choiceFields){ modelParameters.info.debunking = Math.min(1.0, (modelParameters.info.debunking || 0) + 0.1); console.log("Partnered with media for fact-checking."); },
-              "Deploy Public Health 'Ambassadors' to community groups for Q&A": function(choiceFields){ modelParameters.info.community_boost += 0.1; console.log("Deployed PH Ambassadors."); },
-              "Hold Scientific Briefing for Media clarifying H5NX vs H5N1 vs Tripledemic (Requires Sci Cap >= 4)": function(choiceFields){ console.log("Held scientific briefing."); },
-              "Increase funding for regional mental health support services (address anxiety)": function(choiceFields){ modelParameters.info.public_anxiety_multiplier *= 0.95; console.log("Funded mental health services."); },
-              "Initiate preliminary H5NX livestock vaccine feasibility study (Requires Sequencing)": function(choiceFields) { simulationState.h5nxVaccineFeasibilityStarted = true; console.log("Initiated H5NX Livestock Vaccine Feasibility Study."); },
-               // Act 4
-               "Emergency Financial Aid Package for Agriculture Sector (esp. Cattle/Dairy)": function(choiceFields){ console.log("Provided aid to Ag sector."); },
-               "Intense Diplomatic Push on H5NX Trade Bans (Requires High SC)": function(choiceFields){ console.log("Attempting diplomatic negotiations on H5NX bans."); },
-               "Secure National Guard Assistance for Logistics & Supply Chain Support": function(choiceFields) { console.log("Requesting Nat Guard for logistics."); },
-               "Rationing Program for Essential Goods (Food, Fuel) (Risk High SC Cost)": function(choiceFields) { console.log("Implemented rationing."); },
-               "Fund rapid deployment teams for H5NX-infected Wildlife Containment/Culling": function(choiceFields) { modelParameters.animal.h5nx_isolation_rate = Math.min(1.0, (modelParameters.animal.h5nx_isolation_rate || 0) + 0.05); modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.02); console.log("Funded teams to recapture/contain H5NX wildlife."); },
-               "Develop rapid H5NX Point-of-Care test for livestock (Requires Seq & Sci Cap >= 4)": function(choiceFields) { simulationState.h5nxPOCTestDeveloped = true; modelParameters.animal.h5nx_testing_rate = Math.min(1.0, (modelParameters.animal.h5nx_testing_rate || 0) + 0.1); console.log("Developed Rapid H5NX POC Test for Livestock."); },
-              // Act 5
-              "Fast-Track H5NX Sequencing (Highest Priority)": function(choiceFields) { simulationState.sequencingSuccessful = true; if(currentTeam) currentTeam.capacities.scienceCapacity += 1; console.log(`Fast-tracked H5NX sequencing. WIN STATE STEP ACHIEVED (Sequencing).`); },
-              "Standard H5NX Sequencing via Partner Lab (Requires Partnership)": function(choiceFields) { simulationState.sequencingSuccessful = true; console.log(`Partnered for H5NX sequencing. WIN STATE STEP ACHIEVED (Sequencing).`); },
-              "Minimal Sequencing (Confirm Novelty Only, No Pathogenicity)": function(choiceFields) { console.log(`Performed minimal sequencing. Does not achieve Win State step.`); },
-              "Launch/Continue Emergency Livestock Vaccine Development (Req Dev Cap >= 3)": function(choiceFields) { /* Logic handled in submitPoll check */ simulationState.vaccineDeveloped = true; console.log(`Launched/Continued H5NX livestock vaccine dev. WIN STATE STEP ACHIEVED (Vaccine Dev).`); },
-              "Form/Utilize Strategic Livestock Vaccine R&D Partnership (Req Dev Cap >= 3)": function(choiceFields) { /* Logic handled in submitPoll check */ simulationState.vaccineDeveloped = true; console.log(`Partnered for H5NX livestock vaccine dev. WIN STATE STEP ACHIEVED (Vaccine Dev).`); },
-              "Invest to Increase Development Capacity (+1 Dev Cap)": function(choiceFields) { if(currentTeam) currentTeam.capacities.developmentCapacity += 1; console.log(`Increased Dev capacity to ${currentTeam?.capacities?.developmentCapacity}.`); },
-              "Establish National Public-Private Livestock Vaccine Network (Broad Reach)": function(choiceFields) { simulationState.distributionSuccessful = true; modelParameters.animal.h5nx_livestock_vaccine_uptake = Math.min(1.0, (modelParameters.animal.h5nx_livestock_vaccine_uptake || 0) + 0.3); console.log(`Established H5NX livestock distribution network.`); },
-              "Coordinate via Inter-Regional Agricultural Agencies (Leverage Existing)": function(choiceFields) { simulationState.distributionSuccessful = true; modelParameters.animal.h5nx_livestock_vaccine_uptake = Math.min(1.0, (modelParameters.animal.h5nx_livestock_vaccine_uptake || 0) + 0.2); console.log(`Coordinated H5NX livestock distribution via agencies.`); },
-              "Mandate vaccination via emergency order (Fastest but High SC Cost)": function(choiceFields) { simulationState.distributionSuccessful = true; modelParameters.animal.h5nx_livestock_vaccine_uptake = Math.min(1.0, (modelParameters.animal.h5nx_livestock_vaccine_uptake || 0) + 0.4); console.log(`Mandated H5NX livestock vaccination.`); },
-              // Default
-              default: function(choiceFields) { console.log(`Choice "${choiceFields?.ChoiceText || 'N/A'}" selected, no specific sim logic mapped (costs/SC applied if defined).`); }
+        const AIRTABLE_CONFIG = { 
+            BASE_ID: "appSv8IBMvMUGt9tW",
+            SCENES_TABLE_ID: "SceneScape",
+            POLLS_TABLE_ID: "Polls",
+            TEAMS_TABLE_ID: "Teams", // NEW: Teams table
+            API_TOKEN: "patZuRRWmFqesY1ww.4eaa58a4dbc8358bdcbbd1036a21232e121208287476ad40247a5365d2cb096a"
         };
 
-        // ========================================================
-        // == 4. API / DATA FETCHING FUNCTIONS ==
-        // ========================================================
-        async function fetchSceneAndChoiceData(index) { /* ... Same logic ... */ console.log(`Workspaceing data for scene index: ${index}`);const {BASE_ID,SCENES_TABLE_ID,POLLCHOICES_TABLE_ID,API_TOKEN}=AIRTABLE_CONFIG,headers={Authorization:`Bearer ${API_TOKEN}`};if(!API_TOKEN||"YOUR_PERSONAL_ACCESS_TOKEN_HERE"===API_TOKEN)return console.error("Airtable API Token not set."),alert("Error: Airtable API Token not configured."),Promise.reject(new Error("Airtable API Token not configured."));let sceneData=null,pollChoicesData=[];try{const e=encodeURIComponent(`({SceneID}=${index})`),t=`https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}?filterByFormula=${e}&maxRecords=1`;console.log("Fetching Scene URL:",t);const n=await fetch(t,{headers});if(!n.ok){const e=await n.text();console.error("Airtable Scene fetch error details:",e);throw new Error(`Airtable Scene fetch failed: ${n.status} ${n.statusText}`)}const a=await n.json();if(console.log("Airtable Scene Response:",a),!a.records||0===a.records.length)throw new Error(`SceneID ${index} not found.`);if(sceneData=a.records[0],sceneData.fields.PollStem){const e=encodeURIComponent(`({SceneID_Link}=${index})`),t=`https://api.airtable.com/v0/${BASE_ID}/${POLLCHOICES_TABLE_ID}?filterByFormula=${e}&sort%5B0%5D%5Bfield%5D=Order&sort%5B0%5D%5Bdirection%5D=asc`;console.log("Fetching PollChoices URL:",t);const n=await fetch(t,{headers});if(!n.ok){const e=await n.text();console.error("Airtable PollChoices fetch error details:",e);throw new Error(`Airtable PollChoices fetch failed: ${n.statusText}`)}const a=await n.json();console.log("Airtable PollChoices Response:",a),pollChoicesData=a.records||[]}return sceneDataCache[index]={sceneData,pollChoicesData},{sceneData,pollChoicesData}}catch(e){return console.error("Error fetching data from Airtable:",e),Promise.reject(e)}}
-        async function runSimulationModel(currentState) { /* ... Same placeholder logic ... */ console.log("Simulating running Python model..."); const placeholderData = generatePlaceholderChartData(currentState.sceneData); return Promise.resolve({ chartData: placeholderData }); }
-        async function updateBackendState(newState) { /* ... Same placeholder logic ... */ console.log("Simulating update backend state:", newState.lastActionChoiceIDs); return Promise.resolve({ status: "success (simulated)" }); }
+        let teams = [
+            { name: "Region I (New England)", capacities: { testingCapacity: 3, scienceCapacity: 2, publicHealthCapacity: 8, developmentCapacity: 2 }, finances: { system: 7, personal: 4 }, socialCapital: 6 },
+            { name: "Region II (NY/NJ & PR)", capacities: { testingCapacity: 4, scienceCapacity: 3, publicHealthCapacity: 7, developmentCapacity: 3 }, finances: { system: 9, personal: 5 }, socialCapital: 6 }
+            // ...additional teams...
+        ];
+        let currentTeamIndex = 0;
+        let currentTeam = teams[currentTeamIndex];
 
+        let gameStartTime = null;
+        let currentSceneIndex = 0;
+        let totalScenes = 0;
+        let sceneDataCache = {};
+        // ADD: Ensure timelineData is defined globally
+        let timelineData = { totalActs: 0 };
 
-        // ========================================================
-        // == 5. HELPER FUNCTIONS ==
-        // ========================================================
-        // computeTimeline, applyCosts, checkTestingSuccess, generatePlaceholderChartData defined above
-        // getConditionFunction, getUnlockConditionDescription defined above
+        let simulationState = {
+            testingSuccessful: false,
+            sequencingSuccessful: false,
+            vaccineDeveloped: false,
+            distributionSuccessful: false,
+            // ...other state variables...
+        };
 
-        // ========================================================
-        // == 6. CORE RENDERING & EVENT HANDLING ==
-        // ========================================================
+        // ========================================================================
+        // == 2. HELPER FUNCTIONS ==
+        // ========================================================================
+        async function fetchSceneAndChoiceData(index) {
+            // Change sceneID formatting so scene 0 becomes "0000"
+            const formattedID = String(index * 1000).padStart(4, '0');
+            const sceneFilter = `{SceneID}='${formattedID}'`;
+            const pollFilter = `{SceneID_Link}='${formattedID}'`;
 
-        // --- Renders Header ---
-        function renderHeader(sceneFields) { /* ... Same logic ... */ if (!sceneFields) return '<div class="timeline-header">Loading...</div>'; let currentAct = sceneFields.Act; let count = 0; let totalScenesInAct = timelineData[currentAct]?.count || 0; const actScenes = timelineData[currentAct]?.scenes?.sort((a, b) => a - b) || []; count = actScenes.indexOf(sceneFields.SceneID); if (count===-1) count = '?'; else count++; const totalActs = timelineData.totalActs || 0; const elapsedTime = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 60000) : 0; currentAct = (typeof currentAct === 'number' && currentAct >= 0) ? currentAct + 1 : 'N/A'; const displayTotalActs = (typeof totalActs === 'number' && totalActs > 0) ? totalActs : 'N/A'; totalScenesInAct = (typeof totalScenesInAct === 'number' && totalScenesInAct > 0) ? totalScenesInAct : '?'; return `<div class="timeline-header">Act ${currentAct}/${displayTotalActs} | Scene ${count}/${totalScenesInAct} | Game Time: ${sceneFields.GameDateTime || 'N/A'} | Real Time: ~${elapsedTime} min / 180 min Target</div>`; }
-
-        // --- Renders Team Info ---
-        function renderTeamInfo() { console.log("renderTeamInfo called. CurrentTeam:", JSON.stringify(currentTeam)); if (!currentTeam) return '<div class="team-info">Error loading team data</div>'; const caps = currentTeam?.capacities ?? {}; const fins = currentTeam?.finances ?? {}; const socialCap = currentTeam?.socialCapital ?? 'N/A'; if (caps.testingCapacity === undefined) { console.warn("currentTeam.capacities.testingCapacity is undefined inside renderTeamInfo!"); } return `<div class="team-info"><strong>Team:</strong> ${currentTeam?.name ?? 'N/A'} | <strong>Caps:</strong> Test:${caps.testingCapacity ?? '?'} Sci:${caps.scienceCapacity ?? '?'} PH:${caps.publicHealthCapacity ?? '?'} Dev:${caps.developmentCapacity ?? '?'} | <strong>Sys Funds:</strong> ${fins.system ?? '?'}M | <strong>Social Cap:</strong> ${socialCap}</div>`; }
-
-        // --- Renders the Current Scene ---
-        async function renderScene() {
-            const container = document.getElementById("sceneContainer"); if (!container) { console.error("Container not found!"); return; }
-            container.innerHTML = `<div style="padding: 40px; text-align: center;">Loading Scene ${currentSceneIndex}...</div>`;
             try {
-                // **Initialize local variables at the top of the try block**
-                let headerHtml = ''; let sceneHtml = ''; let mediaHtml = ''; let pollHtml = '';
-                let chartHtml = ''; // <<< VERIFIED DECLARATION
-                let showPoll = false;
-                let showChart = false; // <<< VERIFIED DECLARATION
-                let dynamicTeamInfo = ''; let sceneContent = '';
+                const [sceneData, pollChoicesData] = await Promise.all([
+                    fetchAirtableData(AIRTABLE_CONFIG.SCENES_TABLE_ID, sceneFilter),
+                    fetchAirtableData(AIRTABLE_CONFIG.POLLS_TABLE_ID, pollFilter)
+                ]);
 
-                // Fetch data using cache pattern
-                if (!sceneDataCache[currentSceneIndex]) { console.log(`Cache miss for scene ${currentSceneIndex}, fetching...`); sceneDataCache[currentSceneIndex] = await fetchSceneAndChoiceData(currentSceneIndex); }
-                else { console.log(`Cache hit for scene ${currentSceneIndex}.`); }
-                const { sceneData, pollChoicesData } = sceneDataCache[currentSceneIndex];
-
-                if (!sceneData || !sceneData.fields) throw new Error(`Scene data fields not found for index ${currentSceneIndex}`);
-                const scene = sceneData.fields; // Work with the fields object
-
-                // Start timer logic
-                 const firstAct1SceneId = timelineData[1]?.scenes?.sort((a,b)=>a-b)[0] ?? 0; if (scene.Act === 1 && gameStartTime === null && scene.SceneID === firstAct1SceneId) { gameStartTime = Date.now(); console.log("Act 1 started, real time clock running."); }
-
-                // Cleanup charts
-                window.currentChart?.destroy(); window.currentChart1?.destroy(); window.currentChart2?.destroy(); window.currentChart = null; window.currentChart1 = null; window.currentChart2 = null; clearInterval(countdownInterval);
-
-                // DEBUG LOG for currentTeam
-                console.log(`Rendering Scene ${scene.SceneID}. CurrentTeam State BEFORE content injection:`, JSON.stringify(currentTeam));
-                dynamicTeamInfo = renderTeamInfo(); // Render team info using current state
-                sceneContent = scene.Content || ""; // Get base content
-                // --- Dynamic Content Injection (with null checks) ---
-                try { if (scene.SceneID === 2) { sceneContent = sceneContent.replace('{REGION_NAME}', currentTeam?.name ?? 'N/A').replace('{testingCapacity}', currentTeam?.capacities?.testingCapacity ?? '?').replace('{scienceCapacity}', currentTeam?.capacities?.scienceCapacity ?? '?').replace('{publicHealthCapacity}', currentTeam?.capacities?.publicHealthCapacity ?? '?').replace('{developmentCapacity}', currentTeam?.capacities?.developmentCapacity ?? '?').replace('{systemFinances}', currentTeam?.finances?.system ?? '?').replace('{socialCapital}', currentTeam?.socialCapital ?? '?'); } if (scene.SceneID === 11) { sceneContent = sceneContent.replace('{testingCapacity}', currentTeam?.capacities?.testingCapacity ?? '?'); } if (scene.SceneID === 12) { const riskLevel = Math.min(95, 30 + (5 - (currentTeam?.capacities?.testingCapacity ?? 0))*5 + Math.floor(Math.random() * 10)); sceneContent = sceneContent.replace('{RiskLevel}', riskLevel); } if (scene.SceneID === 18) { const icu_capacity_used = Math.min(98, 40 + (modelParameters?.human?.tripledemic_burden ?? 0) * 50 + Math.floor(Math.random() * 10)); const containment_effect = (modelParameters?.animal?.h5nx_isolation_rate ?? 0) > 0.1 ? "showing some effect" : "limited"; sceneContent = sceneContent.replace('{ICU_CAPACITY}', icu_capacity_used.toFixed(0)).replace('{ContainmentEffect}', containment_effect); if (simulationState.sequencingSuccessful) sceneContent += "<br><strong>[Intel Update: Early H5NX sequencing confirms novel virus!]</strong>"; } if (scene.SceneID === 24 && simulationState.h5nxVaccineFeasibilityStarted) { sceneContent = sceneContent.replace('Public understanding (or confusion) regarding H5NX is becoming clearer.', 'Public understanding... <strong>[Intel Update: Preliminary H5NX vaccine feasibility study underway.]</strong>'); } if (scene.SceneID === 29 && simulationState.h5nxPOCTestDeveloped) { sceneContent = sceneContent.replace('Economic recovery is hampered by ongoing agricultural disruption', 'Economic recovery hampered... <strong>[Intel Update: Rapid H5NX POC tests available for livestock.]</strong>'); } } catch (dynError) { console.error(`Error during dynamic content injection for Scene ${scene.SceneID}:`, dynError); }
-
-                // Assemble HTML based on Scene Type
-                headerHtml = renderHeader(scene); // Pass scene fields
-                const widgetType = scene.WidgetType;
-                const isMediaScene = scene.PageType === 'Context' && (widgetType === 'Image' || widgetType === 'Video');
-
-                if (isMediaScene) {
-                    // --- Full-Bleed Media Layout ---
-                    container.style.padding = '0'; // Remove card padding
-
-                    // *** Check your exact Airtable field names for attachments ***
-                    const imageAttachmentField = scene.ImageAttachment; // e.g., use scene.ImageURL if that's the name
-                    const videoAttachmentField = scene.VideoAttachment; // e.g., use scene.VideoURL if that's the name
-                    let mediaUrl = null; let attachmentType = null;
-
-                    console.log(`Scene ${scene.SceneID} - Checking media. WidgetType: ${widgetType}`); console.log("Image Field Data:", JSON.stringify(imageAttachmentField)); console.log("Video Field Data:", JSON.stringify(videoAttachmentField));
-
-                    if (widgetType === 'Image' && imageAttachmentField && Array.isArray(imageAttachmentField) && imageAttachmentField.length > 0 && imageAttachmentField[0].url) { mediaUrl = imageAttachmentField[0].url; attachmentType = imageAttachmentField[0].type; console.log(`Found Image Attachment: ${mediaUrl}`); }
-                    else if (widgetType === 'Video' && videoAttachmentField && Array.isArray(videoAttachmentField) && videoAttachmentField.length > 0 && videoAttachmentField[0].url) { mediaUrl = videoAttachmentField[0].url; attachmentType = videoAttachmentField[0].type; console.log(`Found Video Attachment: ${mediaUrl}`); }
-
-                    if (mediaUrl && widgetType === 'Image') { mediaHtml = `<div class="card-background-media"><img src="${mediaUrl}" alt="${scene.Title || 'Scene Visual'}"></div>`; }
-                    else if (mediaUrl && widgetType === 'Video') { mediaHtml = `<div class="card-background-media"><video autoplay loop muted playsinline src="${mediaUrl}" type="${attachmentType || 'video/mp4'}"></video></div>`; } // playsinline added for better mobile behavior
-                    else { mediaHtml = `<div class="card-background-media" style="background:#111;"><p style="color:#555; padding-top: 40vh;">(Media Missing or Check Airtable Field Name/Type)</p></div>`; console.warn(`Scene ${scene.SceneID}: Expected ${widgetType} but no valid attachment URL found.`); }
-
-                    // Header Area (Positioned Above Background)
-                    let headerAreaHtml = `<div class="media-header-area">${headerHtml}${dynamicTeamInfo}<div class="scene-title">${scene.Title || 'Untitled Scene'}</div></div>`;
-                    // Content Overlay (Positioned Above Background)
-                    let contentOverlayHtml = `<div class="content-overlay"><div class="scene-content">${sceneContent}</div></div>`;
-
-                    container.innerHTML = mediaHtml + headerAreaHtml + contentOverlayHtml; // Stack: BG -> Header -> Overlay
-
-                } else {
-                    // --- Standard Layout ---
-                    container.style.padding = '25px 30px'; // Restore default padding
-
-                    sceneHtml = `<div class="scene-title">${scene.Title || 'Untitled Scene'}</div>`; // ** REMOVED scene-meta here **
-
-                    // Standard Media Placeholder (if applicable)
-                    let standardMediaHtml = '';
-                    if (widgetType === 'Image' || widgetType === 'Video') { standardMediaHtml = `<div class="scene-media-placeholder" id="mediaPlaceholder-${scene.SceneID}">Visual Aid Area: ${widgetType}. (${scene.MediaNotes || 'No media notes.'})<br><small>(Standard Layout Placeholder)</small></div>`; }
-                    sceneHtml += standardMediaHtml;
-
-                    sceneHtml += `<div class="scene-content">${sceneContent}</div>`;
-
-                    // Poll Area (Standard Layout)
-                    console.log(`Scene ${scene.SceneID}: Checking Unlock Condition with key "${scene.UnlockConditionLogic}"`); const unlockConditionFunc = getConditionFunction(scene.UnlockConditionLogic); const isSceneUnlocked = unlockConditionFunc(); console.log(`Scene ${scene.SceneID}: isUnlocked = ${isSceneUnlocked}`);
-                     // Mutual Exclusion...
-                     if (scene.SceneID === 34 && isSceneUnlocked) { const winSceneRecord = sceneDataCache[33]?.sceneData; const winConditionMet = getConditionFunction(winSceneRecord?.fields?.UnlockConditionLogic)(); if (winConditionMet) { container.innerHTML = `<div class="standard-content-wrapper">${headerHtml}${dynamicTeamInfo}<p>Strategic Victory achieved... proceeding.</p></div>`; updateNavButtons(); return; } }
-                     if (scene.SceneID === 33 && !isSceneUnlocked) { container.innerHTML = `<div class="standard-content-wrapper">${headerHtml}${dynamicTeamInfo}<p>Awaiting final conditions...</p></div>`; updateNavButtons(); return; }
-
-                    if (scene.PollStem && pollChoicesData) { if (isSceneUnlocked) { console.log(`Scene ${scene.SceneID}: Rendering poll. Found ${pollChoicesData.length} potential choices.`); try { let visibleChoices = pollChoicesData.filter(choiceRec => { const visibilityFunc = getConditionFunction(choiceRec.fields.VisibilityConditionLogic); const isVisible = visibilityFunc(); console.log(`  Choice Rec ID ${choiceRec.id}: Visible = ${isVisible} | Text Check: ${choiceRec.fields.ChoiceText ? 'OK' : 'MISSING!'}`); return isVisible; }); console.log(`Scene ${scene.SceneID}: ${visibleChoices.length} choices are visible.`); if (visibleChoices.length > 0) { showPoll = true; pollHtml += `<div class="poll-area"><div class="poll-stem"><strong>${scene.PollStem}</strong></div>`; if (scene.TimerSeconds && scene.TimerSeconds > 0) { pollHtml += `<div class="poll-timer" id="countdownTimer">Time Limit: ${Math.floor(scene.TimerSeconds/60)} min</div>`; } pollHtml += `<form id="pollForm">`; visibleChoices.sort((a, b) => (a.fields.Order || 0) - (b.fields.Order || 0)); visibleChoices.forEach((choiceRec, displayIndex) => { const choice = choiceRec.fields; if (!choice) { console.error("Choice fields missing:", choiceRec.id); return; } const choiceValue = choiceRec.id; let choiceText = choice.ChoiceText || `Error: Text missing`; console.log(`   -> Rendering choice: ID ${choiceValue}, Text from Fields: ${choice.ChoiceText}`); let detailText = ''; if (choice.Cost !== null || choice.Time !== null || choice.SC !== null || choice.EffectDescription) { let details = []; if (choice.Cost !== null) details.push(`Cost: ${choice.Cost}M`); if (choice.Time) details.push(`Time: ${choice.Time}`); if (choice.SC !== null) details.push(`SC: ${choice.SC > 0 ? '+' : ''}${choice.SC}`); if (choice.EffectDescription) details.push(`Effect: ${choice.EffectDescription}`); detailText = details.length > 0 ? ` <span class="poll-detail">(${details.join(', ')})</span>` : ''; } let inputType = "checkbox"; const singleChoicePolls = ["Initial Threat Assessment","Interpreting Early Signals","Integrating National & Local Intel","Gauging the Growing Outbreak","Threat Prioritization","Communicating H5NX Risk","Assessing the Economic Shockwave","Authorize and fund the definitive sequencing effort","Commit resources to develop","Select the overarching vaccine distribution strategy","Invest additional funds specifically","Pre-Game Survey: Initial Focus","Initiate H5NX Livestock Vaccine feasibility studies?"]; if (singleChoicePolls.some(title => scene.Title?.includes(title)) || scene.pollType === 'single') { inputType = "radio"; } pollHtml += `<div class="poll-option"><input type="${inputType}" id="choice${displayIndex}" name="pollChoice" value="${choiceValue}"><label for="choice${displayIndex}">${choiceText}${detailText}</label></div>`; }); pollHtml += `</form><button class="poll-submit" onclick="submitPoll()">Submit Response</button></div>`; console.log(`Scene ${scene.SceneID}: Poll HTML generated.`); } else { pollHtml += `<p>No available actions.</p>`; } } catch (pollError) { console.error(`Error rendering poll choices:`, pollError); pollHtml += `<p style='color:red;'>Error displaying options.</p>`; } } else { pollHtml += `<div class="locked-message">Requires: ${getUnlockConditionDescription(scene.UnlockConditionLogic)}.</div>`; } } else if (scene.PollStem) { console.warn(`Scene ${scene.SceneID} has PollStem but no choices.`); pollHtml += `<p style='color: orange;'>Error loading choices.</p>`; }
-                    sceneHtml += pollHtml;
-
-                    // Chart Area (Standard Layout)
-                    const chartWidgetTypes = ["Chart", "Plot_Type_X", "Leaderboard"]; if (isSceneUnlocked && (scene.PageType === "Outcome" || scene.PageType === "Review" || scene.PageType === "Latent Win State Unlock" || scene.PageType === "Leaderboard Wrap") && chartWidgetTypes.includes(scene.WidgetType)) { showChart = true; if (scene.MultipleCharts) { chartHtml += `<div class="outcome-card"><div class="outcome-graph" id="chartContainer1"><canvas id="chartCanvas1"></canvas></div><div class="outcome-graph" id="chartContainer2"><canvas id="chartCanvas2"></canvas></div></div>`; } else { chartHtml += `<div class="outcome-card"><div class="outcome-graph" id="chartContainer0"><canvas id="chartCanvas0"></canvas></div></div>`; } }
-                    sceneHtml += chartHtml;
-
-                    // Final Render (Standard Layout)
-                    container.innerHTML = `
-                        <div class="standard-content-wrapper">
-                            ${headerHtml}
-                            ${dynamicTeamInfo}
-                            ${sceneHtml}
-                        </div>`;
-                }
-
-                // --- Post-Render Actions ---
-                if (showPoll && scene.TimerSeconds && scene.TimerSeconds > 0) { startCountdown(scene.TimerSeconds); }
-                if (showChart) { const currentState = { sceneData: sceneData, currentTeam, modelParameters, simulationState }; runSimulationModel(currentState).then(results => { const chartDataSource = results.chartData; if (chartDataSource) { setTimeout(() => { try { if (scene.MultipleCharts) { renderChartMultiple(sceneData); } else { renderChart(sceneData, 0, chartDataSource); } } catch (chartError) { console.error("Error rendering chart:", chartError); const chartContainer = document.getElementById("chartContainer0") || document.getElementById("chartContainer1"); if(chartContainer) chartContainer.innerHTML = "<p style='color: red;'>Error rendering chart data.</p>"; } }, 150); } else { console.warn("No chart data from model sim for scene:", scene.SceneID); } }).catch(error => { console.error("Error running sim/fetching chart data:", error); const chartContainer = document.getElementById("chartContainer0") || document.getElementById("chartContainer1"); if(chartContainer) chartContainer.innerHTML = "<p style='color: red;'>Error fetching chart data.</p>"; }); }
-                updateNavButtons(); container.scrollTop = 0; // Reset scroll on new scene
-
-            } catch (error) { console.error(`Error fetching/rendering scene ${currentSceneIndex}:`, error); container.innerHTML = `<p style='color: red;'>Error loading scene ${currentSceneIndex}. ${error.message}. Check Airtable setup, API Key/Permissions, and console.</p>`; updateNavButtons(); }
-        }
-
-        // --- Renders Charts ---
-        function renderChart(sceneData, canvasIndex, chartDataSource = null) { /* ... Same logic ... */ const scene=sceneData.fields;const canvasId = `chartCanvas${canvasIndex}`; const canvasElement = document.getElementById(canvasId); if (!canvasElement) { console.error(`Canvas element ${canvasId} not found.`); return; } const ctx = canvasElement.getContext("2d"); let chartInfo = chartDataSource; if (!chartInfo) { console.warn("No chart data source, generating placeholder for scene:", scene?.SceneID); chartInfo = generatePlaceholderChartData(sceneData); } if (!chartInfo || !chartInfo.data) { console.error("No valid chart data for scene:", scene?.SceneID); canvasElement.parentElement.innerHTML = "<p style='color: orange;'>Chart data not available.</p>"; return; } let chartType = chartInfo.type || "bar"; let chartData = chartInfo.data; let options = { responsive: true, maintainAspectRatio: false, color: '#c9d1d9', plugins: { legend: { display: true, labels: { color: "#c9d1d9" } }, title: { display: true, text: chartInfo.title || 'Chart', color: '#f0f6fc', font: { size: 16 } }, tooltip: { backgroundColor: 'rgba(0, 0, 0, 0.8)', titleColor: '#f0f6fc', bodyColor: '#c9d1d9', borderColor: '#30363d', borderWidth: 1 } }, scales: { y: { beginAtZero: true, ticks: { color: "#8b949e" }, grid: { color: "#30363d" } }, x: { ticks: { color: "#8b949e" }, grid: { color: "#30363d" } } } }; if (chartType === 'pie') { delete options.scales; } if (chartType === 'bar' && chartInfo.title?.includes("Scores")) { options.indexAxis = 'y'; options.plugins.legend.display = false; options.scales.x = { ...options.scales.x, beginAtZero: true }; } if (chartType === 'bar' && chartInfo.title?.includes("Capacities")) { options.scales.y = { ...options.scales.y, max: 10 }; } if (chartType === 'line') { options.scales.y = { ...options.scales.y, max: 100, min: 0 }; } if (canvasIndex === 0 && window.currentChart) window.currentChart.destroy(); const newChart = new Chart(ctx, { type: chartType, data: chartData, options: options }); if (canvasIndex === 0) window.currentChart = newChart; }
-        function renderChartMultiple(sceneData) { console.warn("renderChartMultiple needs update."); renderChart(sceneData, 1); renderChart(sceneData, 2); }
-
-        // --- Event Handlers & Navigation ---
-        async function submitPoll() { console.log('submitPoll triggered. CurrentTeam:', JSON.stringify(currentTeam)); /* ... Same logic with null checks ... */ clearInterval(countdownInterval); const form = document.getElementById("pollForm"); const submitButton = document.querySelector('.poll-submit'); let selectedChoiceIDs = []; let allActionsSuccessful = true; if (submitButton) { submitButton.disabled = true; submitButton.innerText = "Processing..."; } else { console.warn("Submit button not found."); } if (form && form.elements["pollChoice"]) { const choices = form.elements["pollChoice"]; if (choices.type === 'radio') { const checkedRadio = Array.from(choices).find(radio => radio.checked); if (checkedRadio) { selectedChoiceIDs.push(checkedRadio.value); } } else if (choices.length === undefined && choices.checked) { selectedChoiceIDs.push(choices.value); } else if (choices.length > 0) { for (let i = 0; i < choices.length; i++) { if (choices[i].checked) { selectedChoiceIDs.push(choices[i].value); if(choices[i].type === 'radio') break; } } } } else { console.log("No form/choices found."); alert("No selection or form found."); if (submitButton) submitButton.innerText = "Error"; return; } console.log("Selected choice Airtable Record IDs:", selectedChoiceIDs); const currentSceneFullData = sceneDataCache[currentSceneIndex]; if (!currentSceneFullData || !currentSceneFullData.pollChoicesData) { console.error("Cannot process poll: Missing cached scene/poll data."); if (submitButton) { submitButton.innerText = "Error"; } return; } const scenePageType = currentSceneFullData.sceneData.fields.PageType; if (scenePageType === "Action Poll" || scenePageType === "Investment") { console.log(`Processing ${selectedChoiceIDs.length} local actions for Scene ${currentSceneFullData.sceneData.fields.SceneID}`); const choiceDataLookup = {}; currentSceneFullData.pollChoicesData.forEach(rec => { choiceDataLookup[rec.id] = rec.fields; }); selectedChoiceIDs.forEach(choiceId => { const choiceData = choiceDataLookup[choiceId]; if (!choiceData) { console.error("Invalid choice ID submitted:", choiceId); allActionsSuccessful = false; return; } const actionText = choiceData.ChoiceText; let actionSucceeded = true; console.log(` -> Processing local: "${actionText}"`, choiceData); let meetsPreReqs = true; const visibilityFunc = getConditionFunction(choiceData.VisibilityConditionLogic); if (!visibilityFunc()) { meetsPreReqs = false; console.warn(`Prereq (visibility) failed at submission.`); alert(`Conditions for "${actionText}" no longer met.`); } else if (actionText.includes("(Requires Dev Cap >= 3)") && (currentTeam?.capacities?.developmentCapacity ?? 0) < 3) { meetsPreReqs = false; console.warn(`Prereq failed: Dev Cap < 3`); alert(`Action Failed: Requires Development Capacity >= 3.`); } else if (actionText.includes("(Requires Sci Cap >= 4)") && (currentTeam?.capacities?.scienceCapacity ?? 0) < 4) { meetsPreReqs = false; console.warn(`Prereq failed: Sci Cap < 4`); alert(`Action Failed: Requires Science Capacity >= 4.`); } else if (actionText.includes("(Requires Sci Cap >= 3)") && (currentTeam?.capacities?.scienceCapacity ?? 0) < 3) { meetsPreReqs = false; console.warn(`Prereq failed: Sci Cap < 3`); alert(`Action Failed: Requires Science Capacity >= 3.`); } else if (actionText.includes("(Requires Dev Cap >= 2)") && (currentTeam?.capacities?.developmentCapacity ?? 0) < 2) { meetsPreReqs = false; console.warn(`Prereq failed: Dev Cap < 2`); alert(`Action Failed: Requires Development Capacity >= 2.`); } else if (actionText.includes("(Requires Partnership)") && !simulationState.sequencingPartnership) { meetsPreReqs = false; console.warn(`Prereq failed: No sequencing partnership.`); alert(`Action Failed: Requires established University Sequencing Partnership.`); } else if (actionText.includes("(Requires High SC)") && (currentTeam?.socialCapital ?? 0) < 7) { meetsPreReqs = false; console.warn(`Prereq failed: SC < 7`); alert(`Action Failed: Requires Social Capital >= 7.`); } else if (actionText.includes("(Requires Sequencing)") && !simulationState.sequencingSuccessful) { meetsPreReqs = false; console.warn(`Prereq failed: Sequencing not successful.`); alert(`Action Failed: Requires successful H5NX Sequencing first.`); } if (!meetsPreReqs) { actionSucceeded = false; allActionsSuccessful = false; } else if (!applyCosts(choiceData)) { actionSucceeded = false; allActionsSuccessful = false; console.warn(`Action failed due to cost.`); } else { const mappingFunction = actionPollMapping[actionText] || actionPollMapping['default']; if (mappingFunction) { try { const result = mappingFunction(choiceData); if (result === false) { actionSucceeded = false; allActionsSuccessful = false; console.warn(`Action explicitly failed by mapping function.`); } } catch (error) { console.error(`Error executing action "${actionText}":`, error); actionSucceeded = false; allActionsSuccessful = false; } } else { console.log(`No specific/default action function mapped for "${actionText}".`); } } console.log(`   Action "${actionText}" ${actionSucceeded ? 'Processed Locally' : 'Failed Locally'}`); }); } else { console.log("Not an Action Poll/Investment scene."); }
-        if (allActionsSuccessful) { console.log('submitPoll - CurrentTeam BEFORE sending state:', JSON.stringify(currentTeam)); const currentStateToSend = { currentTeamIndex, currentTeamCapacities: currentTeam?.capacities ?? {}, currentTeamFinances: currentTeam?.finances ?? {}, currentTeamSocialCapital: currentTeam?.socialCapital ?? null, modelParameters, simulationState, lastActionChoiceIDs: selectedChoiceIDs }; try { if (typeof updateBackendState === 'function') { const backendResponse = await updateBackendState(currentStateToSend); console.log("Simulated backend update response:", backendResponse); } else { console.error("updateBackendState function not defined!");} } catch (error) { console.error("Error simulating backend state update:", error); alert("Failed to sync state with server (simulation). Proceeding locally."); } } const teamInfoContainer = document.querySelector('.team-info'); if(teamInfoContainer) teamInfoContainer.outerHTML = renderTeamInfo(); if (submitButton) { submitButton.innerText = allActionsSuccessful ? "Response Submitted" : "Submission Failed"; } console.log("Poll submission complete. Overall success:", allActionsSuccessful);
-    }
-        async function nextScene() { /* ... Same logic ... */ console.log(`nextScene called. Index: ${currentSceneIndex}, Total: ${totalScenes}`); if (currentSceneIndex < totalScenes - 1) { currentSceneIndex++; await renderScene(); } else { console.log("Already on last scene."); } }
-        async function prevScene() { /* ... Same logic ... */ if (currentSceneIndex > 0) { currentSceneIndex--; await renderScene(); } }
-        function updateNavButtons() { /* ... Same logic ... */ const prevBtn = document.getElementById('prevButton'); const nextBtn = document.getElementById('nextButton'); if (!prevBtn || !nextBtn) return; prevBtn.disabled = (currentSceneIndex === 0); nextBtn.disabled = (currentSceneIndex >= totalScenes - 1); console.log(`Nav buttons updated: Prev ${prevBtn.disabled}, Next ${nextBtn.disabled} (Index: ${currentSceneIndex}, Total Scenes: ${totalScenes})`); }
-        function startCountdown(durationSeconds) { /* ... Corrected logic ... */ clearInterval(countdownInterval); let timeLeft = durationSeconds; const countdownEl = document.getElementById("countdownTimer"); if (!countdownEl) { console.warn("Countdown timer element not found."); return; } console.log("Starting countdown:", durationSeconds); countdownEl.innerText = `Time remaining: ${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`; countdownInterval = setInterval(() => { timeLeft--; const currentCountdownEl = document.getElementById("countdownTimer"); if (currentCountdownEl) { currentCountdownEl.innerText = `Time remaining: ${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`; } else { clearInterval(countdownInterval); return; } if (timeLeft <= 0) { clearInterval(countdownInterval); console.log("Timer finished, auto-submitting poll."); alert("Time's up! Submitting current selection (if any)."); if (typeof submitPoll === 'function') { submitPoll(); } else { console.error("submitPoll function not found!"); } } }, 1000); }
-
-        // ========================================================
-        // == 7. INITIALIZATION ==
-        // ========================================================
-        async function initializeGame() {
-            console.log("Resilient Shield Sim Initializing...");
-            console.log("Start of initializeGame: currentTeam value:", JSON.stringify(currentTeam)); // DEBUG
-            const container = document.getElementById("sceneContainer");
-            try {
-                const { BASE_ID, SCENES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-                let allScenesMetadata = [];
-
-                if (!API_TOKEN || API_TOKEN === "YOUR_PERSONAL_ACCESS_TOKEN_HERE") {
-                     console.error("Airtable API Token not set in AIRTABLE_CONFIG."); container.innerHTML = "<p style='color: orange; padding: 20px;'>Error: Airtable API Token not configured in the script. Cannot load game data. Please add token and refresh.</p>";
-                     updateNavButtons(); return;
-                }
-
-                 console.log("Attempting to fetch initial scene list from Airtable...");
-                 const params = new URLSearchParams(); params.append('sort[0][field]', 'SceneID'); params.append('sort[0][direction]', 'asc');
-                 const fieldsToFetch = ["SceneID", "Act"]; fieldsToFetch.forEach(field => params.append('fields[]', field));
-                 const url = `https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}?${params.toString()}`;
-
-                 console.log("Fetching URL for init:", url);
-                 const response = await fetch(url, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
-                 if (!response.ok) { const errorText = await response.text(); console.error("Airtable fetch error details:", errorText); throw new Error(`Failed to fetch initial scene list: ${response.status} ${response.statusText}`); }
-                 const result = await response.json();
-                 allScenesMetadata = result.records;
-                 if (!allScenesMetadata || allScenesMetadata.length === 0) throw new Error("No scene data loaded from Airtable. Check API Key permissions and Table ID.");
-                 console.log(`Workspaceed metadata for ${allScenesMetadata.length} scenes.`);
-                 totalScenes = allScenesMetadata.length;
-                 timelineData = computeTimeline(allScenesMetadata); // Compute timeline AFTER fetching
-
-                currentSceneIndex = 0;
-                await renderScene(); // Render the first scene
-                console.log("Initial scene rendered.");
-
+                if (!sceneData.length) throw new Error(`Scene with ID "${formattedID}" not found.`);
+                sceneDataCache[index] = { sceneData: sceneData[0], pollChoicesData };
+                return { sceneData: sceneData[0], pollChoicesData };
             } catch (error) {
-               console.error("Error during initialization:", error);
-               if(container) container.innerHTML = `<p style='color: red;'>Fatal Error during initialization: ${error.message}. Could not load game data. Check Airtable config, API key/permissions, and console.</p>`;
-               totalScenes = 0; updateNavButtons();
+                console.error(`Error fetching scene and poll data for SceneID "${formattedID}":`, error);
+                throw error;
             }
         }
 
-        window.onload = initializeGame; // Call the async init function
+        async function fetchAirtableData(tableName, filterFormula = "") {
+            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = { Authorization: `Bearer ${API_TOKEN}` };
+            let url = `https://api.airtable.com/v0/${BASE_ID}/${tableName}`;
+            if (filterFormula) {
+                url += `?filterByFormula=${encodeURIComponent(filterFormula)}`;
+            }
 
+            try {
+                const response = await fetch(url, { headers });
+                if (!response.ok) throw new Error(`Failed to fetch data from ${tableName}: ${response.statusText}`);
+                const data = await response.json();
+                return data.records || [];
+            } catch (error) {
+                console.error(`Error fetching data from Airtable table "${tableName}":`, error);
+                throw error;
+            }
+        }
+
+        function renderMedia(sceneFields) {
+            const widget = sceneFields.WidgetType ? sceneFields.WidgetType.toLowerCase() : "";
+            if (widget === "video" && sceneFields.VideoURL) {
+                let videoUrl = "";
+                console.log("DEBUG VideoURL raw:", sceneFields.VideoURL);
+                if (Array.isArray(sceneFields.VideoURL)) {
+                    videoUrl = sceneFields.VideoURL[0]?.url || "";
+                } else {
+                    videoUrl = sceneFields.VideoURL;
+                }
+                console.log("DEBUG extracted videoUrl:", videoUrl);
+                if (!videoUrl) return "";
+                // CHANGED CODE: Remove muted and add onloadedmetadata to set volume = 1.
+                return `
+                    <div class="card-background-media">
+                        <video autoplay loop playsinline onloadedmetadata="this.volume=1">
+                            <source src="${videoUrl}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>`;
+            } else if (widget === "image" && sceneFields.ImageURL) {
+                let imageUrl = "";
+                console.log("DEBUG ImageURL raw:", sceneFields.ImageURL);
+                if (Array.isArray(sceneFields.ImageURL)) {
+                    imageUrl = sceneFields.ImageURL[0]?.url || "";
+                } else {
+                    imageUrl = sceneFields.ImageURL;
+                }
+                console.log("DEBUG extracted imageUrl:", imageUrl);
+                if (!imageUrl) return "";
+                return `
+                    <div class="card-background-media">
+                        <img src="${imageUrl}" alt="${sceneFields.Title || 'Scene Media'}">
+                    </div>`;
+            } else if (widget === "graph" && sceneFields.GraphData) {
+                return `
+                    <div class="card-background-media">
+                        <canvas id="graphCanvas"></canvas>
+                    </div>`;
+            }
+            return "";
+        }
+
+        function updateNavButtons() {
+            const prevButton = document.getElementById("prevButton");
+            const nextButton = document.getElementById("nextButton");
+            prevButton.disabled = currentSceneIndex === 0;
+            nextButton.disabled = currentSceneIndex >= totalScenes - 1;
+        }
+
+        // ADD: New helper function "renderHeader" before its first use in renderScene
+        function renderHeader(sceneFields) {
+            // Assume timelineData and gameStartTime are defined globally
+            const currentAct = (sceneFields.Act !== undefined) ? sceneFields.Act + 1 : 'N/A';
+            const totalActs = (timelineData && timelineData.totalActs) || 'N/A';
+            const elapsedTime = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 60000) : 0;
+            return `<div class="timeline-header">
+                        <strong>Scene ${sceneFields.SceneID || 'N/A'} - Act ${currentAct}/${totalActs}</strong> | 
+                        Game Time: ${sceneFields.GameDateTime || 'N/A'} | 
+                        Elapsed: ${elapsedTime} min
+                    </div>`;
+        }
+
+        // ADD: New function to update currentTeam from Airtable Teams table
+        async function updateTeamFromAirtable() {
+            if (!currentTeam || !currentTeam.name) {
+                console.warn("No currentTeam name. Cannot update team from Airtable.");
+                return;
+            }
+            const { BASE_ID, TEAMS_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = { Authorization: `Bearer ${API_TOKEN}` };
+            const filter = encodeURIComponent(`{Name}='${currentTeam.name}'`);
+            const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${TEAMS_TABLE_ID}?filterByFormula=${filter}`;
+            try {
+                const getResponse = await fetch(urlGet, { headers });
+                const getData = await getResponse.json();
+                if (getData.records && getData.records.length > 0) {
+                    const latestTeam = getData.records[0].fields;
+                    // Update currentTeam solely based on Airtable data.
+                    currentTeam.capacities = latestTeam.capacities;
+                    currentTeam.finances = latestTeam.finances;
+                    currentTeam.socialCapital = latestTeam.socialCapital;
+                    console.log("Updated currentTeam from Airtable:", currentTeam);
+                } else {
+                    console.warn("No team record found for", currentTeam.name);
+                }
+            } catch (error) {
+                console.error("Error in updateTeamFromAirtable:", error);
+            }
+        }
+
+        // UPDATED updateTeamHeader: remove duplicate extra header (renderTeamResources)
+        async function updateTeamHeader() {
+            await updateTeamFromAirtable();
+            const headerContainer = document.querySelector('.media-header-area');
+            if (headerContainer && sceneDataCache[currentSceneIndex] && sceneDataCache[currentSceneIndex].sceneData.fields) {
+                // Find the team-info element and update it, leaving the header and chart intact.
+                const teamInfoEl = headerContainer.querySelector('.team-info');
+                if (teamInfoEl) {
+                    teamInfoEl.outerHTML = renderTeamInfo();
+                }
+            } else {
+                console.warn("updateTeamHeader: Header container or scene fields not available.");
+            }
+        }
+
+        // NEW: Async helper to process dynamic placeholders of the form {From TableName, FieldName}
+        async function processDynamicPlaceholders(content) {
+            if (!content) return content;
+            const pattern = /{From\s*([^,}]+)\s*,\s*([^}]+)}/g;
+            let match;
+            while ((match = pattern.exec(content)) !== null) {
+                const fullMatch = match[0];
+                const tableName = match[1].trim();
+                const fieldName = match[2].trim();
+                try {
+                    const records = await fetchAirtableData(tableName);
+                    let replacement = "";
+                    if (records && records.length > 0) {
+                        replacement = records[0].fields[fieldName] || "";
+                    }
+                    content = content.replace(fullMatch, replacement);
+                } catch (err) {
+                    console.error(`Error processing placeholder ${fullMatch}:`, err);
+                    content = content.replace(fullMatch, "");
+                }
+            }
+            return content;
+        }
+
+        // NEW: Process team-related placeholders (e.g. {NAME}, {Testing Capacity}, etc.)
+        function processTeamPlaceholders(content) {
+            if (!content || !currentTeam) return content;
+            const mappings = {
+                "NAME": currentTeam.name || "",
+                "TESTING CAPACITY": currentTeam.capacities?.testingCapacity || "0",
+                "SCIENCE CAPACITY": currentTeam.capacities?.scienceCapacity || "0",
+                "HUMAN HEALTHCARE CAPACITY": currentTeam.capacities?.publicHealthCapacity || "0",
+                "DEVELOPMENT CAPACITY": currentTeam.capacities?.developmentCapacity || "0",
+                "SYSTEM FINANCES": currentTeam.finances?.system || "0",
+                "SOCIAL CAPITAL": currentTeam.socialCapital || "0"
+            };
+            // Replace each instance of {token} (ignoring tokens starting with "FROM ")
+            content = content.replace(/{\s*([^}]+)\s*}/g, (match, token) => {
+                const key = token.trim().toUpperCase();
+                if (key.startsWith("FROM ")) {
+                    return "";
+                }
+                return mappings[key] !== undefined ? mappings[key] : "";
+            });
+            return content;
+        }
+
+        // UPDATED updatePlaceholders: first process dynamic {From Table, Field} placeholders, then team tokens.
+        async function updatePlaceholders(content) {
+            if (!content) return content;
+            content = await processDynamicPlaceholders(content);
+            content = processTeamPlaceholders(content);
+            return content;
+        }
+
+        // NEW: Function to write the currentTeam record back to Airtable
+        async function writeTeamToAirtable() {
+            if (!currentTeam || !currentTeam.name) {
+                console.warn("No currentTeam data available for update.");
+                return;
+            }
+            const { BASE_ID, TEAMS_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = {
+                "Authorization": `Bearer ${API_TOKEN}`,
+                "Content-Type": "application/json"
+            };
+            // First, fetch the record ID for the team matching currentTeam.name.
+            const filter = encodeURIComponent(`{Name}='${currentTeam.name}'`);
+            const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${TEAMS_TABLE_ID}?filterByFormula=${filter}`;
+            try {
+                const getResponse = await fetch(urlGet, { headers });
+                const getData = await getResponse.json();
+                if (getData.records && getData.records.length > 0) {
+                    const recordId = getData.records[0].id;
+                    // CHANGED CODE: Correct the URL interpolation for the PATCH request.
+                    const urlPatch = `https://api.airtable.com/v0/${BASE_ID}/${TEAMS_TABLE_ID}/${recordId}`;
+                    const body = JSON.stringify({
+                        fields: {
+                            capacities: currentTeam.capacities,
+                            finances: currentTeam.finances,
+                            socialCapital: currentTeam.socialCapital
+                        }
+                    });
+                    const patchResponse = await fetch(urlPatch, {
+                        method: "PATCH",
+                        headers,
+                        body
+                    });
+                    if (!patchResponse.ok) {
+                        console.error("Error updating team in Airtable:", patchResponse.statusText);
+                    } else {
+                        console.log("Team update written to Airtable successfully.");
+                    }
+                } else {
+                    console.warn("No matching team record found in Airtable for", currentTeam.name);
+                }
+            } catch (error) {
+                console.error("Error in writeTeamToAirtable:", error);
+            }
+        }
+
+        // ADD new helper for dynamic team profile card
+        async function renderTeamProfileCard() {
+            const cardText = `Your team {from Teams} has been assigned to manage the response for Region {NAME}. Familiarize yourselves with your region's starting profile:
+Testing Capacity: {Testing Capacity}
+Science Capacity: {Science Capacity}
+Human Healthcare Capacity: {Human Healthcare Capacity}
+Development Capacity: {Development Capacity}
+System Finances: {System Finances}M
+Social Capital: {Social Capital}
+These values represent relative strengths and weaknesses. Consider how these factors impact your ability to handle simultaneous human and animal health threats. Your regional profile is displayed below the timeline header.`;
+            return await updatePlaceholders(cardText);
+        }
+
+        // ========================================================================
+        // == 3. CORE RENDERING FUNCTIONS ==
+        // ========================================================================
+        async function renderScene() {
+            const container = document.getElementById("sceneContainer");
+            container.innerHTML = `<div style="padding: 40px; text-align: center;">Loading Scene ${currentSceneIndex}...</div>`;
+            try {
+                // ...existing code...
+                if (!sceneDataCache[currentSceneIndex]) {
+                    console.log(`Cache miss for scene ${currentSceneIndex}, fetching...`);
+                    sceneDataCache[currentSceneIndex] = await fetchSceneAndChoiceData(currentSceneIndex);
+                }
+                const cache = sceneDataCache[currentSceneIndex];
+                if (!cache || !cache.sceneData) {
+                    throw new Error(`Scene data missing for scene ${currentSceneIndex}.`);
+                }
+                const scene = cache.sceneData.fields;
+                // NEW: Use custom team profile for scene "2000" only
+                const sceneID = String(scene.SceneID).trim();
+                const dynamicTeamInfo = (sceneID === "2000")
+                     ? await renderTeamProfileCard()
+                     : renderTeamInfo();
+                // Process scene title and content with placeholders
+                const processedSceneTitle = await updatePlaceholders(scene.Title || "Untitled Scene");
+                const processedSceneContent = await updatePlaceholders(scene.Content || "No content available.");
+                
+                // Render header & team info as before
+                const headerHtml = renderHeader(scene);
+                
+                const sceneTitleHtml = `<div class="scene-title">${processedSceneTitle}</div>`;
+                const sceneContentHtml = `<div class="scene-content">${processedSceneContent}</div>`;
+                
+                // Combine header area with timeline header, team info, and dynamic team card
+                let pollHtml = "";
+                let chartHtml = "";
+                let sunburstHtml = "";
+                // Build poll HTML only if poll choices are available
+                const pollChoicesData = cache.pollChoicesData;
+                if (pollChoicesData && pollChoicesData.length > 0) {
+                    pollHtml = `<div class="poll-area" style="margin: 6.25px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box; background: #21262d; border: 1px solid #30363d; border-radius: 6px;">
+                                  <div class="poll-stem">${scene.PollStem ? `<strong>${scene.PollStem}</strong>` : "<strong>Please select an option:</strong>"}</div>
+                                  ${renderPollOptions(pollChoicesData)}
+                                  <button type="button" class="poll-submit" onclick="submitPoll(event)">Submit Response</button>
+                                </div>`;
+                }
+                // Build chart HTML if widget type is Chart
+                if ((scene.WidgetType || "").toLowerCase() === "chart") {
+                    chartHtml = `<div class="outcome-card" style="margin: 6.25px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box;">
+                                  <div class="outcome-graph">
+                                    <canvas id="chartCanvas0"></canvas>
+                                  </div>
+                                </div>`;
+                }
+                // Check if the chart type is "sunburst"
+                if ((scene.WidgetType || "").toLowerCase() === "sunburst") {
+                    sunburstHtml = `<div class="sunburst-chart" style="margin: 20px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box; background: #21262d; border: 1px solid #30363d; border-radius: 6px;">
+                                        <div id="sunburstChart" style="width: 100%; height: 400px;"></div>
+                                    </div>`;
+                    // Fetch and render the sunburst chart
+                    setTimeout(() => renderSunburstChart(), 500);
+                }
+                container.innerHTML = `
+                    ${renderMedia(scene)}
+                    <div class="media-header-area" style="padding-bottom: 10px;">
+                        ${headerHtml}
+                    </div>
+                    <div class="main-visual-area" style="display: flex; justify-content: center; align-items: center; height: auto; margin: 100px auto 10px auto; padding-bottom: 10px;">
+                        ${chartHtml || pollHtml}
+                    </div>
+                    <div class="content-overlay" style="padding-top: 10px;">
+                        <div class="scene-title">${processedSceneTitle}</div>
+                        <div class="scene-content">${processedSceneContent}</div>
+                        ${sunburstHtml}
+                    </div>
+                `;
+                // Render chart after inserting HTML
+                if ((scene.WidgetType || "").toLowerCase() === "chart") {
+                    const chartData = generatePlaceholderChartData(cache.sceneData);
+                    renderChart(cache.sceneData, 0, chartData);
+                }
+                // ...existing code to update nav buttons and timers...
+                updateNavButtons();
+                if (scene.TimerSeconds && scene.TimerSeconds > 0) {
+                    initializeTimer(scene.TimerSeconds);
+                }
+                await updateTeamHeader();
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;">Error loading scene ${currentSceneIndex}: ${error.message}</p>`;
+            }
+        }
+
+        async function submitPoll(event) {
+            if (event) event.preventDefault();
+            clearInterval(countdownInterval);
+
+            const form = document.getElementById("pollForm");
+            const submitButton = document.querySelector('.poll-submit');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerText = "Processing...";
+            }
+
+            let selectedChoiceIDs = [];
+            if (form && form.elements["pollChoice"]) {
+                const choices = form.elements["pollChoice"];
+                if (choices.type === 'radio') {
+                    const checkedRadio = Array.from(choices).find(radio => radio.checked);
+                    if (checkedRadio) selectedChoiceIDs.push(checkedRadio.value);
+                } else if (choices.length !== undefined) {
+                    for (let i = 0; i < choices.length; i++) {
+                        if (choices[i].checked) selectedChoiceIDs.push(choices[i].value);
+                    }
+                }
+            } else {
+                console.error("No poll options found.");
+                if (submitButton) submitButton.innerText = "Submit Response";
+                return;
+            }
+
+            console.log("Selected choice ID(s):", selectedChoiceIDs);
+
+            const currentSceneFullData = sceneDataCache[currentSceneIndex];
+            if (!currentSceneFullData || !currentSceneFullData.pollChoicesData) {
+                console.error("Cannot process poll: Missing cached scene/poll data.");
+                if (submitButton) submitButton.innerText = "Error";
+                return;
+            }
+
+            // Create a lookup for poll choices.
+            const choiceDataLookup = {};
+            currentSceneFullData.pollChoicesData.forEach(choice => {
+                choiceDataLookup[choice.id] = choice;
+            });
+
+            try {
+                // Process each selected poll choice.
+                for (const choiceID of selectedChoiceIDs) {
+                    const choiceData = choiceDataLookup[choiceID];
+                    if (!choiceData) {
+                        console.error("Invalid choice ID submitted:", choiceID);
+                        console.error("An invalid choice was selected. Please try again.");
+                        return;
+                    }
+                    // Evaluate condition before submission.
+                    if (!evaluateCondition(choiceData.fields.ConditionLogic)) {
+                        console.error(`The selected option "${choiceData.fields.ChoiceText}" is no longer valid.`);
+                        return;
+                    }
+                    await processPollSubmission(choiceData, currentSceneFullData.sceneData.fields.PollID);
+                }
+                if (submitButton) {
+                    submitButton.innerText = "Response Submitted";
+                }
+                console.log("Poll submission complete.");
+                // ...existing code (no alert on success)...
+            } catch (error) {
+                console.error("Error during poll submission:", error);
+                if (submitButton) {
+                    submitButton.innerText = "Error";
+                }
+                // ...existing code (no alert on failure)...
+            }
+        }
+
+        // New helper function to process individual poll submissions based on target table.
+        async function processPollSubmission(choiceRecord, pollID) {
+            const modelParameter = choiceRecord.fields.ModelParameter;
+            const operator = choiceRecord.fields.Operator; // e.g. "+" or "-" (if provided)
+            if (modelParameter) {
+                const parts = modelParameter.split(".");
+                if (parts.length >= 2) {
+                    const tableName = parts[0].trim().toLowerCase();
+                    const fieldName = parts.slice(1).join(".").trim();
+                    if (tableName === "teams") {
+                        // Mapping for Teams fields update
+                        const teamFieldMapping = {
+                            "System Finance": { container: "finances", key: "system" },
+                            "Social Capital": { container: "socialCapital" },
+                            "Human Healthcare Capacity": { container: "capacities", key: "publicHealthCapacity" },
+                            "Testing Capacity": { container: "capacities", key: "testingCapacity" },
+                            "Science Capacity": { container: "capacities", key: "scienceCapacity" },
+                            "Animal Surveillance Capacity": { container: "capacities", key: "animalSurveillanceCapacity" }
+                        };
+                        const mapping = teamFieldMapping[fieldName];
+                        if (mapping) {
+                            let inc = parseInt(choiceRecord.fields.UpdateIncrement || "1", 10);
+                            if (operator && operator.trim() === "-") {
+                                inc = -inc;
+                            }
+                            if (mapping.container === "finances") {
+                                currentTeam.finances[mapping.key] = (parseInt(currentTeam.finances[mapping.key] || "0", 10) + inc);
+                            } else if (mapping.container === "capacities") {
+                                currentTeam.capacities[mapping.key] = (parseInt(currentTeam.capacities[mapping.key] || "0", 10) + inc);
+                            } else if (mapping.container === "socialCapital") {
+                                currentTeam.socialCapital = (parseInt(currentTeam.socialCapital || "0", 10) + inc);
+                            }
+                            await writeTeamToAirtable();
+                        } else {
+                            console.error("Mapping not found for field:", fieldName);
+                        }
+                    } else if (tableName === "configgame") {
+                        let inc = parseInt(choiceRecord.fields.UpdateIncrement || "1", 10);
+                        if (operator && operator.trim() === "-") {
+                            inc = -inc;
+                        }
+                        await writeToGameConfig(fieldName, inc);
+                    } else {
+                        await updatePollResponses([choiceRecord.id], pollID);
+                    }
+                } else {
+                    await updatePollResponses([choiceRecord.id], pollID);
+                }
+            } else {
+                await updatePollResponses([choiceRecord.id], pollID);
+            }
+        }
+
+        // NEW: Helper to update GameConfig table
+        async function writeToGameConfig(fieldName, increment) {
+            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const tableName = "ConfigGame";
+            const headers = {
+                Authorization: `Bearer ${API_TOKEN}`,
+                "Content-Type": "application/json"
+            };
+            try {
+                // Find GameConfig record for the current team using a filter on the 'Team' field
+                const filter = encodeURIComponent(`{Team}='${currentTeam.name}'`);
+                const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${tableName}?filterByFormula=${filter}`;
+                const response = await fetch(urlGet, { headers });
+                const data = await response.json();
+                if (data.records && data.records.length > 0) {
+                    const recordId = data.records[0].id;
+                    const currentVal = parseInt(data.records[0].fields[fieldName] || "0", 10);
+                    const newVal = currentVal + increment;
+                    const body = JSON.stringify({
+                        fields: { [fieldName]: newVal }
+                    });
+                    const urlPatch = `https://api.airtable.com/v0/${BASE_ID}/${tableName}/${recordId}`;
+                    const patchResponse = await fetch(urlPatch, { method: "PATCH", headers, body });
+                    if (!patchResponse.ok) {
+                        console.error("Error updating GameConfig for", fieldName, patchResponse.statusText);
+                    } else {
+                        console.log("GameConfig updated successfully for", fieldName, newVal);
+                    }
+                } else {
+                    console.warn("No GameConfig record found for team", currentTeam.name);
+                }
+            } catch (error) {
+                console.error("Error in writeToGameConfig:", error);
+            }
+        }
+
+        async function updatePollResponses(selectedChoiceIDs, pollID) {
+            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = {
+                Authorization: `Bearer ${API_TOKEN}`,
+                "Content-Type": "application/json"
+            };
+            // CHANGED CODE: Build payload and check response with json parsing.
+            const payload = {
+                records: selectedChoiceIDs.map(choiceId => ({
+                    fields: {
+                        PollID: pollID,       // Ensure these field names match Airtable
+                        ChoiceID: choiceId,
+                        TeamID: currentTeam.name,
+                        ResponseCount: 1
+                    }
+                }))
+            };
+            console.log("Sending PollResponses payload:", JSON.stringify(payload));
+            const url = `https://api.airtable.com/v0/${BASE_ID}/PollResponses`;
+            const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+            if (!response.ok) {
+                const text = await response.text();
+                console.error("Error updating PollResponses:", text);
+                throw new Error(`Failed to update PollResponses: ${response.statusText}`);
+            }
+            const data = await response.json();
+            console.log("PollResponses updated successfully:", data);
+        }
+
+        async function writeToAirtable(tableName, parameter, value) {
+            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = {
+                Authorization: `Bearer ${API_TOKEN}`,
+                "Content-Type": "application/json"
+            };
+
+            const record = {
+                fields: {
+                    Parameter: parameter,
+                    Value: value,
+                    TeamID: currentTeam.name
+                }
+            };
+            console.log(`Writing to ${tableName} with payload:`, JSON.stringify({ records: [record] }));
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${tableName}`;
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({ records: [record] })
+                });
+                const text = await response.text();
+                console.log(`Raw response from ${tableName} POST:`, text);
+                if (!response.ok) {
+                    console.error(`Error writing to ${tableName}:`, text);
+                    throw new Error(`Failed to write to ${tableName}: ${response.status} ${response.statusText}`);
+                }
+                console.log(`Successfully wrote to ${tableName}:`, parameter, value);
+            } catch (error) {
+                console.error(`Error writing to ${tableName}:`, error);
+                throw error;
+            }
+        }
+
+        async function nextScene() {
+            if (currentSceneIndex < totalScenes - 1) {
+                currentSceneIndex++;
+                await renderScene();
+            }
+        }
+
+        async function prevScene() {
+            if (currentSceneIndex > 0) {
+                currentSceneIndex--;
+                await renderScene();
+            }
+        }
+
+        // ========================================================================
+        // == 4. INITIALIZATION ==
+        // ========================================================================
+        async function fetchInitialSceneList() {
+            const { BASE_ID, SCENES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = { Authorization: `Bearer ${API_TOKEN}` };
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}?sort%5B0%5D%5Bfield%5D=SceneID&sort%5B0%5D%5Bdirection%5D=asc`;
+            try {
+                const response = await fetch(url, { headers });
+                // Fix: use "response" instead of "getResponse"
+                const data = await response.json();
+                // ...existing code...
+                if (!data.records || data.records.length === 0) {
+                    totalScenes = 1;
+                    return;
+                }
+                totalScenes = data.records.length;
+            } catch (error) {
+                console.error("Error fetching scene list:", error);
+                throw error;
+            }
+        }
+
+        async function initializeGame() {
+            console.log("Initializing Game...");
+            try {
+                await fetchInitialSceneList();
+            } catch (err) {
+                console.error("Scene list error. Using default totalScenes.");
+                totalScenes = 40;
+            }
+            await renderScene();
+        }
+
+        document.addEventListener("DOMContentLoaded", initializeGame);
+
+        // ADD: Missing initializeTimer function
+        function initializeTimer(durationSeconds) {
+            const container = document.getElementById("sceneContainer");
+            if (!container) {
+                console.error("Scene container not found!");
+                return;
+            }
+            // Create or update the timer element
+            let timerEl = document.getElementById("timerDisplay");
+            if (!timerEl) {
+                timerEl = document.createElement("div");
+                timerEl.id = "timerDisplay";
+                timerEl.style.position = "absolute";
+                timerEl.style.top = "10px";
+                timerEl.style.right = "10px";
+                timerEl.style.backgroundColor = "#161b22";
+                timerEl.style.color = "#f0f6fc";
+                timerEl.style.padding = "10px 15px";
+                timerEl.style.border = "1px solid #30363d";
+                timerEl.style.borderRadius = "6px";
+                timerEl.style.fontSize = "1em";
+                timerEl.style.fontWeight = "500";
+                container.appendChild(timerEl);
+            }
+            clearInterval(window.countdownInterval);
+            let timeLeft = durationSeconds;
+            updateTimerDisplay(timerEl, timeLeft);
+            window.countdownInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft >= 0) {
+                    updateTimerDisplay(timerEl, timeLeft);
+                } else {
+                    clearInterval(window.countdownInterval);
+                    alert("Time's up! Submitting current selection (if any).");
+                    submitPoll();
+                }
+            }, 1000);
+        }
+        
+        // ADD: Helper to update timer display
+        function updateTimerDisplay(timerEl, timeLeft) {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = (timeLeft % 60).toString().padStart(2, "0");
+            timerEl.innerText = `Time remaining: ${minutes}:${seconds}`;
+        }
+
+        function renderTeamInfo() { 
+            console.log("renderTeamInfo called. CurrentTeam:", JSON.stringify(currentTeam)); 
+            if (!currentTeam) return '<div class="team-info">Error loading team data</div>'; 
+            const caps = currentTeam.capacities || {}; 
+            const fins = currentTeam.finances || {}; 
+            const socialCap = currentTeam.socialCapital !== undefined ? currentTeam.socialCapital : 'N/A'; 
+            // Updated to display actual capacity values
+            return `<div class="team-info">
+                <strong>Team:</strong> ${currentTeam.name || 'N/A'} | 
+                <strong>Testing Capacity:</strong> ${caps.testingCapacity || 0} | 
+                <strong>Science Capacity:</strong> ${caps.scienceCapacity || 0} | 
+                <strong>Public Health Capacity:</strong> ${caps.publicHealthCapacity || 0} | 
+                <strong>Development Capacity:</strong> ${caps.developmentCapacity || 0} | 
+                <strong>System Finances:</strong> ${fins.system || 0}M | 
+                <strong>Social Capital:</strong> ${socialCap}
+            </div>`;
+        }
+
+        // Updated renderTeamResources function to dynamically insert region name and parameter values:
+        function renderTeamResources() {
+            if (!currentTeam) return "<p>Team data not available.</p>";
+            const caps = currentTeam.capacities || {};
+            const fins = currentTeam.finances || {};
+            const social = currentTeam.socialCapital ?? "N/A";
+            return `
+                <div class="team-info">
+                    Your team has been assigned to manage the response for <strong>Region ${currentTeam.name}</strong>.
+                    Familiarize yourselves with your region's starting profile:
+                    <ul>
+                        <li>Testing Capacity: ${caps.testingCapacity || 0}</li>
+                        <li>Science Capacity: ${caps.scienceCapacity || 0}</li>
+                        <li>Human Healthcare Capacity: ${caps.publicHealthCapacity || 0}</li>
+                        <li>Development Capacity: ${caps.developmentCapacity || 0}</li>
+                        <li>System Finances: ${fins.system || 0}M</li>
+                        <li>Social Capital: ${social}</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Add missing generatePlaceholderChartData() helper:
+        function generatePlaceholderChartData(sceneData) {
+            if (!sceneData || !sceneData.fields) {
+                return null;
+            }
+            const scene = sceneData.fields;
+            let chartType = (scene.ChartType || "bar").toLowerCase();
+            let chartData;
+            if (chartType === "line") {
+                chartData = {
+                    labels: ["Start", "Act 1", "Act 2", "Act 3", "Now"],
+                    datasets: [{
+                        label: scene.Title || "Line Chart",
+                        data: [10, 20, 30, 40, 50],
+                        borderColor: "#58a6ff",
+                        fill: false
+                    }]
+                };
+            } else if (chartType === "pie") {
+                chartData = {
+                    labels: ["A", "B", "C", "D"],
+                    datasets: [{
+                        data: [25, 25, 25, 25],
+                        backgroundColor: ["#2ea043", "#58a6ff", "#db617e", "#a371f7"]
+                    }]
+                };
+            } else {
+                chartData = {
+                    labels: ["X", "Y", "Z"],
+                    datasets: [{
+                        label: scene.Title || "Bar Chart",
+                        data: [5, 15, 10],
+                        backgroundColor: "#58a6ff"
+                    }]
+                };
+            }
+            return { type: chartType, data: chartData, title: scene.Title || "Chart" };
+        }
+
+        function renderChart(sceneData, canvasIndex, chartDataSource = null) {
+            const canvasId = `chartCanvas${canvasIndex}`;
+            const canvasElement = document.getElementById(canvasId);
+            if (!canvasElement) {
+                console.error(`Canvas element ${canvasId} not found.`);
+                return;
+            }
+            const ctx = canvasElement.getContext("2d");
+            let chartInfo = chartDataSource;
+            if (!chartInfo) {
+                console.warn("No chart data source, generating placeholder for scene:", sceneData?.fields?.SceneID);
+                chartInfo = generatePlaceholderChartData(sceneData);
+            }
+            if (!chartInfo || !chartInfo.data) {
+                console.error("No valid chart data for scene:", sceneData?.fields?.SceneID);
+                canvasElement.parentElement.innerHTML = "<p style='color: orange;'>Chart data not available.</p>";
+                return;
+            }
+            const chartType = chartInfo.type || "bar";
+            const chartData = chartInfo.data;
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: "#c9d1d9" }
+                    },
+                    title: {
+                        display: true,
+                        text: chartInfo.title || "Chart",
+                        color: "#f0f6fc",
+                        font: { size: 16 }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: "#8b949e" },
+                        grid: { color: "#30363d" }
+                    },
+                    y: {
+                        ticks: { color: "#8b949e" },
+                        grid: { color: "#30363d" }
+                    }
+                }
+            };
+            if (chartType === "pie") {
+                delete options.scales;
+            }
+            if (canvasIndex === 0 && window.currentChart) {
+                window.currentChart.destroy();
+            }
+            const newChart = new Chart(ctx, { type: chartType, data: chartData, options: options });
+            if (canvasIndex === 0) {
+                window.currentChart = newChart;
+            }
+        }
+
+        async function renderSunburstChart() {
+            const { BASE_ID, TEAMS_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const headers = { Authorization: `Bearer ${API_TOKEN}` };
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${TEAMS_TABLE_ID}`;
+        
+            try {
+                const response = await fetch(url, { headers });
+                if (!response.ok) throw new Error(`Failed to fetch Teams data: ${response.statusText}`);
+                const data = await response.json();
+        
+                // Process data for the sunburst chart
+                const labels = [];
+                const parents = [];
+                const values = [];
+        
+                data.records.forEach(record => {
+                    const fields = record.fields;
+                    labels.push(fields.Name || "Unknown");
+                    parents.push(""); // Root level
+                    values.push(fields.Capacities?.testingCapacity || 0); // Example: testingCapacity
+                });
+        
+                const chartData = [{
+                    type: "sunburst",
+                    labels: labels,
+                    parents: parents,
+                    values: values,
+                    branchvalues: "total",
+                    textinfo: "label+value+percent entry"
+                }];
+        
+                const layout = {
+                    margin: { t: 10, l: 10, r: 10, b: 10 },
+                    paper_bgcolor: "#161b22",
+                    font: { color: "#c9d1d9" }
+                };
+        
+                Plotly.newPlot("sunburstChart", chartData, layout);
+            } catch (error) {
+                console.error("Error rendering sunburst chart:", error);
+                document.getElementById("sunburstChart").innerHTML = `<p style="color: red;">Error loading chart data.</p>`;
+            }
+        }
+
+        function evaluateCondition(conditionLogic) {
+            if (!conditionLogic || typeof conditionLogic !== "string") return true;
+
+            try {
+                // Dynamically evaluate the condition using the current simulation state
+                const conditionFunction = new Function(
+                    "simulationState",
+                    `return (${conditionLogic});`
+                );
+                return conditionFunction(simulationState);
+            } catch (error) {
+                console.error(`Error evaluating condition "${conditionLogic}":`, error);
+                return false;
+            }
+        }
+
+        function renderPollOptions(pollChoicesData) {
+            const pollHtml = pollChoicesData
+                .filter(choice => evaluateCondition(choice.fields.ConditionLogic)) // Only include visible choices
+                .map((choice, idx) => {
+                    const choiceText = choice.fields.ChoiceText || "Choice text missing";
+                    return `
+                        <div class="poll-option">
+                            <input type="radio" id="choice${idx}" name="pollChoice" value="${choice.id}">
+                            <label for="choice${idx}">${choiceText}</label>
+                        </div>`;
+                })
+                .join("");
+
+            return `<form id="pollForm">${pollHtml}</form>`;
+        }
     </script>
 </body>
 </html>

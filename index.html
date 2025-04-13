@@ -51,7 +51,7 @@
         .media-header-area > * { pointer-events: auto; }
         .content-overlay { 
             position: absolute; 
-            bottom: 0; 
+            bottom: 70px; /* CHANGED: Stop the overlay above the fixed nav-buttons */
             left: 0; 
             right: 0; 
             z-index: 1; 
@@ -61,6 +61,7 @@
             padding: 20px 30px; 
             max-height: 45%; 
             overflow-y: auto; 
+            padding-bottom: 70px; /* ADDED: Ensure content stops above bottom nav-buttons */
         }
         .content-overlay::-webkit-scrollbar { width: 6px; }
         .content-overlay::-webkit-scrollbar-thumb { 
@@ -229,6 +230,31 @@
         .scene-text {
             position: relative;
             z-index: 3;
+        }
+        /* NEW: Interactive overlay for polls/plots */
+        .interactive-overlay {
+            position: absolute;
+            top: 80px;
+            left: 0;
+            right: 0;
+            bottom: 220px;
+            z-index: 3;
+            pointer-events: auto;
+        }
+        /* NEW: Narrative overlay for scene title and content */
+        .narrative-overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2;
+            background-color: rgba(22,27,34,0.9);
+            padding: 20px 30px;
+            overflow-y: auto;
+            max-height: 40%;
+        }
+        .timeline-header {
+            font-size: 0.7em; /* NEW: 30% smaller text for scene info and timing */
         }
     </style>
 </head>
@@ -524,7 +550,7 @@
                     console.warn("No matching team record found in Airtable for", currentTeam.name);
                 }
             } catch (error) {
-                console.error("Error in writeTeamToAirtable:", error);
+                console.error("Error in writeToAirtable:", error);
             }
         }
 
@@ -607,10 +633,10 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     <div class="media-header-area" style="padding-bottom: 10px;">
                         ${headerHtml}
                     </div>
-                    <div class="main-visual-area" style="display: flex; justify-content: center; align-items: center; height: auto; margin: 100px auto 10px auto; padding-bottom: 10px;">
+                    <div class="interactive-overlay">
                         ${chartHtml || pollHtml}
                     </div>
-                    <div class="content-overlay" style="padding-top: 10px;">
+                    <div class="narrative-overlay" style="padding-top: 10px;">
                         <div class="scene-title">${processedSceneTitle}</div>
                         <div class="scene-content">${processedSceneContent}</div>
                         ${sunburstHtml}
@@ -760,8 +786,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         // NEW: Helper to update GameConfig table
         async function writeToGameConfig(fieldName, increment) {
-            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const tableName = "ConfigGame";
+            const { BASE_ID, CONFIG_GAME_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
             const headers = {
                 Authorization: `Bearer ${API_TOKEN}`,
                 "Content-Type": "application/json"
@@ -769,8 +794,9 @@ These values represent relative strengths and weaknesses. Consider how these fac
             try {
                 // Find GameConfig record for the current team using a filter on the 'Team' field
                 const filter = encodeURIComponent(`{Team}='${currentTeam.name}'`);
-                const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${tableName}?filterByFormula=${filter}`;
+                const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${CONFIG_GAME_TABLE_ID}?filterByFormula=${filter}`;
                 const response = await fetch(urlGet, { headers });
+                if (!response.ok) throw new Error(`Failed to fetch GameConfig data: ${response.statusText}`);
                 const data = await response.json();
                 if (data.records && data.records.length > 0) {
                     const recordId = data.records[0].id;
@@ -779,7 +805,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     const body = JSON.stringify({
                         fields: { [fieldName]: newVal }
                     });
-                    const urlPatch = `https://api.airtable.com/v0/${BASE_ID}/${tableName}/${recordId}`;
+                    const urlPatch = `https://api.airtable.com/v0/${BASE_ID}/${CONFIG_GAME_TABLE_ID}/${recordId}`;
                     const patchResponse = await fetch(urlPatch, { method: "PATCH", headers, body });
                     if (!patchResponse.ok) {
                         console.error("Error updating GameConfig for", fieldName, patchResponse.statusText);
@@ -795,7 +821,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
         }
 
         async function updatePollResponses(selectedChoiceIDs, pollID) {
-            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const { BASE_ID, POLL_RESPONSES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
             const headers = {
                 Authorization: `Bearer ${API_TOKEN}`,
                 "Content-Type": "application/json"
@@ -812,7 +838,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                 }))
             };
             console.log("Sending PollResponses payload:", JSON.stringify(payload));
-            const url = `https://api.airtable.com/v0/${BASE_ID}/PollResponses`;
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${POLL_RESPONSES_TABLE_ID}`;
             const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
             if (!response.ok) {
                 const text = await response.text();
@@ -915,21 +941,25 @@ These values represent relative strengths and weaknesses. Consider how these fac
                 console.error("Scene container not found!");
                 return;
             }
-            // Create or update the timer element
+            // Create or update the round timer element
             let timerEl = document.getElementById("timerDisplay");
             if (!timerEl) {
                 timerEl = document.createElement("div");
                 timerEl.id = "timerDisplay";
                 timerEl.style.position = "absolute";
-                timerEl.style.top = "10px";
-                timerEl.style.right = "10px";
+                timerEl.style.top = "10px";          // at the top
+                timerEl.style.right = "10px";        // at the right
+                timerEl.style.width = "50px";        // round shape dimensions
+                timerEl.style.height = "50px";
+                timerEl.style.borderRadius = "50%";
                 timerEl.style.backgroundColor = "#161b22";
                 timerEl.style.color = "#f0f6fc";
-                timerEl.style.padding = "10px 15px";
-                timerEl.style.border = "1px solid #30363d";
-                timerEl.style.borderRadius = "6px";
-                timerEl.style.fontSize = "1em";
-                timerEl.style.fontWeight = "500";
+                timerEl.style.display = "flex";
+                timerEl.style.alignItems = "center";
+                timerEl.style.justifyContent = "center";
+                timerEl.style.fontSize = "0.75em";
+                timerEl.style.fontWeight = "bold";
+                timerEl.style.zIndex = "20";
                 container.appendChild(timerEl);
             }
             clearInterval(window.countdownInterval);
@@ -941,17 +971,17 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     updateTimerDisplay(timerEl, timeLeft);
                 } else {
                     clearInterval(window.countdownInterval);
-                    alert("Time's up! Submitting current selection (if any).");
                     submitPoll();
                 }
             }, 1000);
         }
-        
+
         // ADD: Helper to update timer display
         function updateTimerDisplay(timerEl, timeLeft) {
             const minutes = Math.floor(timeLeft / 60);
             const seconds = (timeLeft % 60).toString().padStart(2, "0");
-            timerEl.innerText = `Time remaining: ${minutes}:${seconds}`;
+            // Only display the MM:SS without extra text
+            timerEl.innerText = `${minutes}:${seconds}`;
         }
 
         function renderTeamInfo() { 

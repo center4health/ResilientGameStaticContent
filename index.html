@@ -234,12 +234,25 @@
         /* NEW: Interactive overlay for polls/plots */
         .interactive-overlay {
             position: absolute;
-            top: 80px;
+            top: 40px; /* reduced from 80px */
+            height: calc(100% - 160px); /* adjusted reserved space: 40px (top) + 120px (narrative) */
             left: 0;
             right: 0;
-            bottom: 220px;
-            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             pointer-events: auto;
+            margin-bottom: 10px; /* added margin to separate from lower section */
+        }
+        .card-dynamic {
+            height: 90%;  /* 90% of the interactive overlay's height */
+            width: 90%;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow-y: auto;
+            padding: 0; /* removed extra padding */
+            box-sizing: border-box;
         }
         /* NEW: Narrative overlay for scene title and content */
         .narrative-overlay {
@@ -252,9 +265,43 @@
             padding: 20px 30px;
             overflow-y: auto;
             max-height: 40%;
+            margin-top: 10px; /* added top margin for spacing */
         }
         .timeline-header {
             font-size: 0.7em; /* NEW: 30% smaller text for scene info and timing */
+        }
+        /* Add new poll card styles */
+        .poll-card {
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .poll-card.selected {
+            background-color: #2ea043;
+        }
+        .poll-text {
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+        .poll-details {
+            font-size: 0.8em;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .poll-detail {
+            margin-right: 5px;
+        }
+        @media screen and (max-width: 600px) {
+            .interactive-overlay {
+                height: calc(100% - 220px); /* Increase reserved space for narrative overlay */
+            }
+            .narrative-overlay {
+                max-height: 180px; /* Fixed maximum height to ensure spacing */
+                padding: 15px 20px; /* Adjust padding if necessary */
+            }
         }
     </style>
 </head>
@@ -303,6 +350,9 @@
             distributionSuccessful: false,
             // ...other state variables...
         };
+
+        // Add a global flag to prevent duplicate submissions
+        let pollSubmitted = false;
 
         // ========================================================================
         // == 2. HELPER FUNCTIONS ==
@@ -574,7 +624,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
             const container = document.getElementById("sceneContainer");
             container.innerHTML = `<div style="padding: 40px; text-align: center;">Loading Scene ${currentSceneIndex}...</div>`;
             try {
-                // ...existing code...
+                // ...existing code to load scene data...
                 if (!sceneDataCache[currentSceneIndex]) {
                     console.log(`Cache miss for scene ${currentSceneIndex}, fetching...`);
                     sceneDataCache[currentSceneIndex] = await fetchSceneAndChoiceData(currentSceneIndex);
@@ -584,75 +634,66 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     throw new Error(`Scene data missing for scene ${currentSceneIndex}.`);
                 }
                 const scene = cache.sceneData.fields;
-                // NEW: Use custom team profile for scene "2000" only
-                const sceneID = String(scene.SceneID).trim();
-                const dynamicTeamInfo = (sceneID === "2000")
-                     ? await renderTeamProfileCard()
-                     : renderTeamInfo();
-                // Process scene title and content with placeholders
                 const processedSceneTitle = await updatePlaceholders(scene.Title || "Untitled Scene");
                 const processedSceneContent = await updatePlaceholders(scene.Content || "No content available.");
-                
-                // Render header & team info as before
                 const headerHtml = renderHeader(scene);
-                
-                const sceneTitleHtml = `<div class="scene-title">${processedSceneTitle}</div>`;
-                const sceneContentHtml = `<div class="scene-content">${processedSceneContent}</div>`;
-                
-                // Combine header area with timeline header, team info, and dynamic team card
-                let pollHtml = "";
-                let chartHtml = "";
-                let sunburstHtml = "";
-                // Build poll HTML only if poll choices are available
-                const pollChoicesData = cache.pollChoicesData;
-                if (pollChoicesData && pollChoicesData.length > 0) {
-                    pollHtml = `<div class="poll-area" style="margin: 6.25px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box; background: #21262d; border: 1px solid #30363d; border-radius: 6px;">
-                                  <div class="poll-stem">${scene.PollStem ? `<strong>${scene.PollStem}</strong>` : "<strong>Please select an option:</strong>"}</div>
-                                  ${renderPollOptions(pollChoicesData)}
-                                  <button type="button" class="poll-submit" onclick="submitPoll(event)">Submit Response</button>
-                                </div>`;
-                }
-                // Build chart HTML if widget type is Chart
-                if ((scene.WidgetType || "").toLowerCase() === "chart") {
-                    chartHtml = `<div class="outcome-card" style="margin: 6.25px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box;">
-                                  <div class="outcome-graph">
-                                    <canvas id="chartCanvas0"></canvas>
+
+                let pollHtml = "", chartHtml = "", sunburstHtml = "";
+                if (cache.pollChoicesData && cache.pollChoicesData.length > 0) {
+                    pollHtml = `<div class="poll-area">
+                                  <div class="poll-stem">
+                                      ${scene.PollStem ? `<strong>${scene.PollStem}</strong>` : "<strong>Please select an option:</strong>"}
                                   </div>
-                                </div>`;
+                                  ${renderPollOptions(cache.pollChoicesData)}
+                               </div>`;
                 }
-                // Check if the chart type is "sunburst"
+                if ((scene.WidgetType || "").toLowerCase() === "chart") {
+                    chartHtml = `<div class="outcome-card">
+                                   <div class="outcome-graph">
+                                      <canvas id="chartCanvas0"></canvas>
+                                   </div>
+                                 </div>`;
+                }
                 if ((scene.WidgetType || "").toLowerCase() === "sunburst") {
-                    sunburstHtml = `<div class="sunburst-chart" style="margin: 20px auto; max-height: 450px; overflow-y: auto; padding: 15px; box-sizing: border-box; background: #21262d; border: 1px solid #30363d; border-radius: 6px;">
-                                        <div id="sunburstChart" style="width: 100%; height: 400px;"></div>
-                                    </div>`;
-                    // Fetch and render the sunburst chart
+                    sunburstHtml = `<div class="sunburst-chart">
+                                       <div id="sunburstChart" style="width: 100%; height: 400px;"></div>
+                                     </div>`;
                     setTimeout(() => renderSunburstChart(), 500);
+                }
+                // Only include the interactive overlay if poll or chart content exists.
+                let interactiveOverlayHtml = "";
+                if (chartHtml || pollHtml) {
+                    interactiveOverlayHtml = `<div class="interactive-overlay">
+                                                  <div class="card-dynamic">
+                                                      ${chartHtml || pollHtml}
+                                                  </div>
+                                              </div>`;
                 }
                 container.innerHTML = `
                     ${renderMedia(scene)}
                     <div class="media-header-area" style="padding-bottom: 10px;">
                         ${headerHtml}
                     </div>
-                    <div class="interactive-overlay">
-                        ${chartHtml || pollHtml}
-                    </div>
+                    ${interactiveOverlayHtml}
                     <div class="narrative-overlay" style="padding-top: 10px;">
                         <div class="scene-title">${processedSceneTitle}</div>
                         <div class="scene-content">${processedSceneContent}</div>
-                        ${sunburstHtml}
+                        ${sunburstHtml || ""}
                     </div>
                 `;
-                // Render chart after inserting HTML
-                if ((scene.WidgetType || "").toLowerCase() === "chart") {
-                    const chartData = generatePlaceholderChartData(cache.sceneData);
-                    renderChart(cache.sceneData, 0, chartData);
-                }
-                // ...existing code to update nav buttons and timers...
                 updateNavButtons();
                 if (scene.TimerSeconds && scene.TimerSeconds > 0) {
                     initializeTimer(scene.TimerSeconds);
                 }
                 await updateTeamHeader();
+                if ((scene.WidgetType || "").toLowerCase() === "chart") {
+                    const chartData = generatePlaceholderChartData(cache.sceneData);
+                    try {
+                        renderChart(cache.sceneData, 0, chartData);
+                    } catch (chartError) {
+                        console.error("Error rendering chart:", chartError);
+                    }
+                }
             } catch (error) {
                 container.innerHTML = `<p style="color:red;">Error loading scene ${currentSceneIndex}: ${error.message}</p>`;
             }
@@ -660,74 +701,74 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         async function submitPoll(event) {
             if (event) event.preventDefault();
-            clearInterval(countdownInterval);
-
+            if (pollSubmitted) return; // Prevent duplicate submissions
+            pollSubmitted = true;
+            clearInterval(window.countdownInterval);  // Ensure timer is cleared
             const form = document.getElementById("pollForm");
             const submitButton = document.querySelector('.poll-submit');
             if (submitButton) {
                 submitButton.disabled = true;
                 submitButton.innerText = "Processing...";
             }
-
             let selectedChoiceIDs = [];
             if (form && form.elements["pollChoice"]) {
-                const choices = form.elements["pollChoice"];
-                if (choices.type === 'radio') {
-                    const checkedRadio = Array.from(choices).find(radio => radio.checked);
-                    if (checkedRadio) selectedChoiceIDs.push(checkedRadio.value);
-                } else if (choices.length !== undefined) {
-                    for (let i = 0; i < choices.length; i++) {
-                        if (choices[i].checked) selectedChoiceIDs.push(choices[i].value);
-                    }
+                let pollElems = form.elements["pollChoice"];
+                if (!pollElems.length) { 
+                    pollElems = [pollElems];
+                } else {
+                    pollElems = Array.from(pollElems);
                 }
-            } else {
-                console.error("No poll options found.");
-                if (submitButton) submitButton.innerText = "Submit Response";
+                pollElems.forEach(radio => {
+                    if (radio.checked) {
+                        selectedChoiceIDs.push(radio.value);
+                    }
+                });
+            }
+            if (selectedChoiceIDs.length === 0) {
+                console.log("No poll option selected, advancing scene.");
+                setTimeout(() => nextScene(), 100); // Added delay to help UI settle
+                pollSubmitted = false;
                 return;
             }
-
-            console.log("Selected choice ID(s):", selectedChoiceIDs);
-
+            console.log("Submit Response clicked. Selected IDs:", selectedChoiceIDs);
             const currentSceneFullData = sceneDataCache[currentSceneIndex];
             if (!currentSceneFullData || !currentSceneFullData.pollChoicesData) {
                 console.error("Cannot process poll: Missing cached scene/poll data.");
                 if (submitButton) submitButton.innerText = "Error";
+                pollSubmitted = false;
                 return;
             }
-
-            // Create a lookup for poll choices.
             const choiceDataLookup = {};
             currentSceneFullData.pollChoicesData.forEach(choice => {
                 choiceDataLookup[choice.id] = choice;
             });
-
             try {
-                // Process each selected poll choice.
                 for (const choiceID of selectedChoiceIDs) {
                     const choiceData = choiceDataLookup[choiceID];
                     if (!choiceData) {
                         console.error("Invalid choice ID submitted:", choiceID);
-                        console.error("An invalid choice was selected. Please try again.");
-                        return;
+                        throw new Error("Invalid poll option selected.");
                     }
-                    // Evaluate condition before submission.
                     if (!evaluateCondition(choiceData.fields.ConditionLogic)) {
                         console.error(`The selected option "${choiceData.fields.ChoiceText}" is no longer valid.`);
-                        return;
+                        throw new Error("Poll option no longer valid.");
                     }
                     await processPollSubmission(choiceData, currentSceneFullData.sceneData.fields.PollID);
                 }
                 if (submitButton) {
                     submitButton.innerText = "Response Submitted";
                 }
-                console.log("Poll submission complete.");
-                // ...existing code (no alert on success)...
+                console.log("Poll submission complete. Advancing scene.");
+                setTimeout(() => nextScene(), 100);
             } catch (error) {
                 console.error("Error during poll submission:", error);
                 if (submitButton) {
                     submitButton.innerText = "Error";
                 }
-                // ...existing code (no alert on failure)...
+                // Advance scene even if an error occurs
+                setTimeout(() => nextScene(), 100);
+            } finally {
+                pollSubmitted = false;
             }
         }
 
@@ -763,9 +804,11 @@ These values represent relative strengths and weaknesses. Consider how these fac
                             } else if (mapping.container === "socialCapital") {
                                 currentTeam.socialCapital = (parseInt(currentTeam.socialCapital || "0", 10) + inc);
                             }
+                            await updatePollResponses([choiceRecord.id], pollID);
                             await writeTeamToAirtable();
                         } else {
                             console.error("Mapping not found for field:", fieldName);
+                            await updatePollResponses([choiceRecord.id], pollID);
                         }
                     } else if (tableName === "configgame") {
                         let inc = parseInt(choiceRecord.fields.UpdateIncrement || "1", 10);
@@ -773,6 +816,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                             inc = -inc;
                         }
                         await writeToGameConfig(fieldName, inc);
+                        await updatePollResponses([choiceRecord.id], pollID);
                     } else {
                         await updatePollResponses([choiceRecord.id], pollID);
                     }
@@ -787,10 +831,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
         // NEW: Helper to update GameConfig table
         async function writeToGameConfig(fieldName, increment) {
             const { BASE_ID, CONFIG_GAME_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = {
-                Authorization: `Bearer ${API_TOKEN}`,
-                "Content-Type": "application/json"
-            };
+            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
             try {
                 // Find GameConfig record for the current team using a filter on the 'Team' field
                 const filter = encodeURIComponent(`{Team}='${currentTeam.name}'`);
@@ -822,15 +863,11 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         async function updatePollResponses(selectedChoiceIDs, pollID) {
             const { BASE_ID, POLL_RESPONSES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = {
-                Authorization: `Bearer ${API_TOKEN}`,
-                "Content-Type": "application/json"
-            };
-            // CHANGED CODE: Build payload and check response with json parsing.
+            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
             const payload = {
                 records: selectedChoiceIDs.map(choiceId => ({
                     fields: {
-                        PollID: pollID,       // Ensure these field names match Airtable
+                        PollID: pollID,
                         ChoiceID: choiceId,
                         TeamID: currentTeam.name,
                         ResponseCount: 1
@@ -851,11 +888,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         async function writeToAirtable(tableName, parameter, value) {
             const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = {
-                Authorization: `Bearer ${API_TOKEN}`,
-                "Content-Type": "application/json"
-            };
-
+            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
             const record = {
                 fields: {
                     Parameter: parameter,
@@ -885,10 +918,9 @@ These values represent relative strengths and weaknesses. Consider how these fac
         }
 
         async function nextScene() {
-            if (currentSceneIndex < totalScenes - 1) {
-                currentSceneIndex++;
-                await renderScene();
-            }
+            currentSceneIndex++;
+            console.log("Advancing to scene", currentSceneIndex);
+            await renderScene();
         }
 
         async function prevScene() {
@@ -907,9 +939,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
             const url = `https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}?sort%5B0%5D%5Bfield%5D=SceneID&sort%5B0%5D%5Bdirection%5D=asc`;
             try {
                 const response = await fetch(url, { headers });
-                // Fix: use "response" instead of "getResponse"
                 const data = await response.json();
-                // ...existing code...
                 if (!data.records || data.records.length === 0) {
                     totalScenes = 1;
                     return;
@@ -931,7 +961,6 @@ These values represent relative strengths and weaknesses. Consider how these fac
             }
             await renderScene();
         }
-
         document.addEventListener("DOMContentLoaded", initializeGame);
 
         // ADD: Missing initializeTimer function
@@ -950,8 +979,8 @@ These values represent relative strengths and weaknesses. Consider how these fac
                 timerEl.style.top = "10px";          // at the top
                 timerEl.style.right = "10px";        // at the right
                 timerEl.style.width = "50px";        // round shape dimensions
-                timerEl.style.height = "50px";
-                timerEl.style.borderRadius = "50%";
+                timerEl.style.height = "50px";       // round shape dimensions
+                timerEl.style.borderRadius = "50%";     // round shape dimensions
                 timerEl.style.backgroundColor = "#161b22";
                 timerEl.style.color = "#f0f6fc";
                 timerEl.style.display = "flex";
@@ -965,13 +994,15 @@ These values represent relative strengths and weaknesses. Consider how these fac
             clearInterval(window.countdownInterval);
             let timeLeft = durationSeconds;
             updateTimerDisplay(timerEl, timeLeft);
-            window.countdownInterval = setInterval(() => {
+            window.countdownInterval = setInterval(async () => {
                 timeLeft--;
                 if (timeLeft >= 0) {
                     updateTimerDisplay(timerEl, timeLeft);
                 } else {
                     clearInterval(window.countdownInterval);
-                    submitPoll();
+                    if (!pollSubmitted) {
+                        await submitPoll();
+                    }
                 }
             }, 1000);
         }
@@ -984,12 +1015,12 @@ These values represent relative strengths and weaknesses. Consider how these fac
             timerEl.innerText = `${minutes}:${seconds}`;
         }
 
-        function renderTeamInfo() { 
-            console.log("renderTeamInfo called. CurrentTeam:", JSON.stringify(currentTeam)); 
-            if (!currentTeam) return '<div class="team-info">Error loading team data</div>'; 
-            const caps = currentTeam.capacities || {}; 
-            const fins = currentTeam.finances || {}; 
-            const socialCap = currentTeam.socialCapital !== undefined ? currentTeam.socialCapital : 'N/A'; 
+        function renderTeamInfo() {
+            console.log("renderTeamInfo called. CurrentTeam:", JSON.stringify(currentTeam));
+            if (!currentTeam) return '<div class="team-info">Error loading team data</div>';
+            const caps = currentTeam.capacities || {};
+            const fins = currentTeam.finances || {};
+            const socialCap = currentTeam.socialCapital !== undefined ? currentTeam.socialCapital : 'N/A';
             // Updated to display actual capacity values
             return `<div class="team-info">
                 <strong>Team:</strong> ${currentTeam.name || 'N/A'} | 
@@ -1002,7 +1033,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
             </div>`;
         }
 
-        // Updated renderTeamResources function to dynamically insert region name and parameter values:
+        // Updated renderTeamResources function to dynamically insert region name and parameter values
         function renderTeamResources() {
             if (!currentTeam) return "<p>Team data not available.</p>";
             const caps = currentTeam.capacities || {};
@@ -1024,13 +1055,21 @@ These values represent relative strengths and weaknesses. Consider how these fac
             `;
         }
 
-        // Add missing generatePlaceholderChartData() helper:
+        // Add missing generatePlaceholderChartData() helper
         function generatePlaceholderChartData(sceneData) {
             if (!sceneData || !sceneData.fields) {
                 return null;
             }
             const scene = sceneData.fields;
-            let chartType = (scene.ChartType || "bar").toLowerCase();
+            let rawType = scene.ChartType;
+            let chartType = "bar";
+            if (typeof rawType === "string" && rawType.trim().toLowerCase() !== "false" && rawType.trim() !== "") {
+                 chartType = rawType.trim().toLowerCase();
+            }
+            // Force chartType to "bar" if it is "sunburst"
+            if (chartType === "sunburst") {
+                 chartType = "bar";
+            }
             let chartData;
             if (chartType === "line") {
                 chartData = {
@@ -1040,7 +1079,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                         data: [10, 20, 30, 40, 50],
                         borderColor: "#58a6ff",
                         fill: false
-                    }]
+                    }],
                 };
             } else if (chartType === "pie") {
                 chartData = {
@@ -1048,7 +1087,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     datasets: [{
                         data: [25, 25, 25, 25],
                         backgroundColor: ["#2ea043", "#58a6ff", "#db617e", "#a371f7"]
-                    }]
+                    }],
                 };
             } else {
                 chartData = {
@@ -1057,7 +1096,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                         label: scene.Title || "Bar Chart",
                         data: [5, 15, 10],
                         backgroundColor: "#58a6ff"
-                    }]
+                    }],
                 };
             }
             return { type: chartType, data: chartData, title: scene.Title || "Chart" };
@@ -1119,45 +1158,43 @@ These values represent relative strengths and weaknesses. Consider how these fac
             if (canvasIndex === 0) {
                 window.currentChart = newChart;
             }
-        }
+        };
 
         async function renderSunburstChart() {
             const { BASE_ID, TEAMS_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
             const headers = { Authorization: `Bearer ${API_TOKEN}` };
             const url = `https://api.airtable.com/v0/${BASE_ID}/${TEAMS_TABLE_ID}`;
-        
             try {
                 const response = await fetch(url, { headers });
                 if (!response.ok) throw new Error(`Failed to fetch Teams data: ${response.statusText}`);
                 const data = await response.json();
-        
                 // Process data for the sunburst chart
                 const labels = [];
                 const parents = [];
                 const values = [];
-        
                 data.records.forEach(record => {
                     const fields = record.fields;
                     labels.push(fields.Name || "Unknown");
                     parents.push(""); // Root level
                     values.push(fields.Capacities?.testingCapacity || 0); // Example: testingCapacity
                 });
-        
+
                 const chartData = [{
                     type: "sunburst",
                     labels: labels,
                     parents: parents,
                     values: values,
                     branchvalues: "total",
-                    textinfo: "label+value+percent entry"
+                    textinfo: "label+value+percent entry",
+                    font: { color: "#c9d1d9" }
                 }];
-        
+
                 const layout = {
                     margin: { t: 10, l: 10, r: 10, b: 10 },
                     paper_bgcolor: "#161b22",
                     font: { color: "#c9d1d9" }
                 };
-        
+
                 Plotly.newPlot("sunburstChart", chartData, layout);
             } catch (error) {
                 console.error("Error rendering sunburst chart:", error);
@@ -1165,9 +1202,9 @@ These values represent relative strengths and weaknesses. Consider how these fac
             }
         }
 
+        // Evaluate condition using the current simulation state
         function evaluateCondition(conditionLogic) {
             if (!conditionLogic || typeof conditionLogic !== "string") return true;
-
             try {
                 // Dynamically evaluate the condition using the current simulation state
                 const conditionFunction = new Function(
@@ -1182,19 +1219,56 @@ These values represent relative strengths and weaknesses. Consider how these fac
         }
 
         function renderPollOptions(pollChoicesData) {
-            const pollHtml = pollChoicesData
-                .filter(choice => evaluateCondition(choice.fields.ConditionLogic)) // Only include visible choices
-                .map((choice, idx) => {
-                    const choiceText = choice.fields.ChoiceText || "Choice text missing";
-                    return `
-                        <div class="poll-option">
-                            <input type="radio" id="choice${idx}" name="pollChoice" value="${choice.id}">
-                            <label for="choice${idx}">${choiceText}</label>
-                        </div>`;
-                })
-                .join("");
+            if (
+                pollChoicesData.length > 0 &&
+                pollChoicesData[0].fields.ActionType &&
+                pollChoicesData[0].fields.ActionType.toLowerCase() === "action"
+            ) {
+                // Render as selectable cards with a "Finished" button for multiple selection.
+                const pollHtml = pollChoicesData
+                    .filter(choice => evaluateCondition(choice.fields.ConditionLogic))
+                    .map(choice => {
+                        const choiceText = choice.fields.ChoiceText || "Choice text missing";
+                        const cost = choice.fields.Cost || "N/A";
+                        const time = choice.fields.Time || "N/A";
+                        const social = choice.fields.SocialCapital || "N/A";
+                        return `
+                            <div class="poll-card" onclick="toggleSelection(this)" data-choice-id="${choice.id}">
+                                <div class="poll-text">${choiceText}</div>
+                                <div class="poll-details">
+                                    <span class="poll-detail">Cost: ${cost}</span>
+                                    <span class="poll-detail">Time: ${time}</span>
+                                    <span class="poll-detail">Social: ${social}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join("");
+                return `<form id="pollForm">
+                            ${pollHtml}
+                            <button type="button" class="poll-finished" onclick="submitPoll(event)">Finished</button>
+                        </form>`;
+            } else {
+                // Default: Render as radio buttons with "Submit Response" button.
+                const pollHtml = pollChoicesData
+                    .filter(choice => evaluateCondition(choice.fields.ConditionLogic))
+                    .map((choice, idx) => {
+                        const choiceText = choice.fields.ChoiceText || "Choice text missing";
+                        return `
+                            <div class="poll-option">
+                                <input type="radio" id="choice${idx}" name="pollChoice" value="${choice.id}">
+                                <label for="choice${idx}">${choiceText}</label>
+                            </div>
+                        `;
+                    }).join("");
+                return `<form id="pollForm">
+                            ${pollHtml}
+                            <button type="button" class="poll-submit" onclick="submitPoll(event)">Submit Response</button>
+                        </form>`;
+            }
+        }
 
-            return `<form id="pollForm">${pollHtml}</form>`;
+        function toggleSelection(cardEl) {
+            cardEl.classList.toggle("selected");
         }
     </script>
 </body>

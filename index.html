@@ -303,6 +303,60 @@
                 padding: 15px 20px; /* Adjust padding if necessary */
             }
         }
+        .poll-category-nav {
+            display: flex;
+            gap: 18px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 6px;
+            overflow-x: auto;
+        }
+        .poll-category-tab {
+            cursor: pointer;
+            font-weight: 500;
+            color: #8b949e;
+            padding: 4px 10px;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-bottom 0.2s;
+            white-space: nowrap;
+        }
+        .poll-category-tab.selected {
+            color: #f0f6fc;
+            border-bottom: 2px solid #2ea043;
+        }
+        .poll-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        @media (max-width: 700px) {
+            .poll-cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .poll-no-choices {
+            color: #8b949e;
+            padding: 20px 0;
+            text-align: center;
+        }
+        .poll-search-bar-container {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .poll-search-bar {
+            padding: 7px 12px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            background: #161b22;
+            color: #c9d1d9;
+            font-size: 1em;
+            width: 260px;
+            max-width: 100%;
+        }
+        .poll-search-bar:focus {
+            outline: 2px solid #2ea043;
+        }
     </style>
 </head>
 <body>
@@ -337,6 +391,7 @@
         let currentTeam = teams[currentTeamIndex];
 
         let gameStartTime = null;
+        let sceneList = [];
         let currentSceneIndex = 0;
         let totalScenes = 0;
         let sceneDataCache = {};
@@ -354,26 +409,44 @@
         // Add a global flag to prevent duplicate submissions
         let pollSubmitted = false;
 
+        // Add global for selected action poll category
+        let selectedActionCategory = null;
+
+        // Add global for search
+        let actionPollSearchTerm = "";
+
         // ========================================================================
         // == 2. HELPER FUNCTIONS ==
         // ========================================================================
+        // Replace fetchSceneAndChoiceData to fetch *all* action poll choices for action polls
         async function fetchSceneAndChoiceData(index) {
-            // Change sceneID formatting so scene 0 becomes "0000"
-            const formattedID = String(index * 1000).padStart(4, '0');
-            const sceneFilter = `{SceneID}='${formattedID}'`;
-            const pollFilter = `{SceneID_Link}='${formattedID}'`;
+            if (!sceneList[index]) throw new Error(`No scene at index ${index}`);
+            const sceneID = sceneList[index].fields.SceneID;
+            const sceneFilter = `{SceneID}='${sceneID}'`;
+            const pollFilter = `{SceneID_Link}='${sceneID}'`;
 
+            // Fetch scene data and all action poll choices (not just those mapped to this scene)
             try {
-                const [sceneData, pollChoicesData] = await Promise.all([
+                const [sceneData, pollChoicesData, allActionChoices] = await Promise.all([
                     fetchAirtableData(AIRTABLE_CONFIG.SCENES_TABLE_ID, sceneFilter),
-                    fetchAirtableData(AIRTABLE_CONFIG.POLLS_TABLE_ID, pollFilter)
+                    fetchAirtableData(AIRTABLE_CONFIG.POLLS_TABLE_ID, pollFilter),
+                    fetchAirtableData(AIRTABLE_CONFIG.POLLS_TABLE_ID, `AND({ActionType}='Action')`)
                 ]);
-
-                if (!sceneData.length) throw new Error(`Scene with ID "${formattedID}" not found.`);
-                sceneDataCache[index] = { sceneData: sceneData[0], pollChoicesData };
-                return { sceneData: sceneData[0], pollChoicesData };
+                if (!sceneData.length) throw new Error(`Scene with SceneID "${sceneID}" not found.`);
+                // If this is an action poll, use all unlocked action choices, else use mapped choices
+                let pollChoices = pollChoicesData;
+                const sceneFields = sceneData[0].fields;
+                if (
+                    pollChoicesData.length > 0 &&
+                    pollChoicesData[0].fields.ActionType &&
+                    pollChoicesData[0].fields.ActionType.toLowerCase() === "action"
+                ) {
+                    pollChoices = allActionChoices;
+                }
+                sceneDataCache[index] = { sceneData: sceneData[0], pollChoicesData: pollChoices };
+                return { sceneData: sceneData[0], pollChoicesData: pollChoices };
             } catch (error) {
-                console.error(`Error fetching scene and poll data for SceneID "${formattedID}":`, error);
+                console.error(`Error fetching scene and poll data for SceneID "${sceneID}":`, error);
                 throw error;
             }
         }
@@ -615,6 +688,103 @@ System Finances: {System Finances}M
 Social Capital: {Social Capital}
 These values represent relative strengths and weaknesses. Consider how these factors impact your ability to handle simultaneous human and animal health threats. Your regional profile is displayed below the timeline header.`;
             return await updatePlaceholders(cardText);
+        }
+
+        // Helper to get unique categories from poll choices
+        function getActionPollCategories(pollChoicesData) {
+            const categories = [];
+            pollChoicesData.forEach(choice => {
+                if (evaluateCondition(choice.fields.ConditionLogic)) {
+                    const cat = choice.fields.Category || "Uncategorized";
+                    if (!categories.includes(cat)) categories.push(cat);
+                }
+            });
+            return categories;
+        }
+
+        // Helper to render category nav
+        function renderActionCategoryNav(categories) {
+            return `
+                <div class="poll-category-nav">
+                    ${categories.map(cat => `
+                        <span class="poll-category-tab${selectedActionCategory === cat ? " selected" : ""}" 
+                              onclick="selectActionCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        // Expose category selector to window
+        window.selectActionCategory = function(cat) {
+            selectedActionCategory = cat;
+            // Re-render only the poll cards area
+            const pollCardsArea = document.getElementById("actionPollCardsArea");
+            if (pollCardsArea && window.currentActionPollChoices) {
+                pollCardsArea.innerHTML = renderActionPollCards(window.currentActionPollChoices, cat);
+            }
+        };
+
+        // Add search bar rendering to action poll UI
+        function renderActionPollSearchBar() {
+            return `
+                <div class="poll-search-bar-container">
+                    <input
+                        type="text"
+                        class="poll-search-bar"
+                        id="actionPollSearchBar"
+                        placeholder="Search actions..."
+                        value="${actionPollSearchTerm.replace(/"/g, "&quot;")}"
+                        oninput="window.onActionPollSearchInput(this.value)"
+                        autocomplete="off"
+                    />
+                </div>
+            `;
+        }
+
+        // Expose search handler
+        window.onActionPollSearchInput = function(val) {
+            actionPollSearchTerm = val;
+            const pollCardsArea = document.getElementById("actionPollCardsArea");
+            if (pollCardsArea && window.currentActionPollChoices) {
+                pollCardsArea.innerHTML = renderActionPollCards(window.currentActionPollChoices, selectedActionCategory);
+            }
+        };
+
+        // Helper to render action poll cards for a category
+        function renderActionPollCards(pollChoicesData, category) {
+            let filtered = pollChoicesData.filter(choice =>
+                evaluateCondition(choice.fields.ConditionLogic) &&
+                (choice.fields.Category || "Uncategorized") === category
+            );
+            if (actionPollSearchTerm && actionPollSearchTerm.trim() !== "") {
+                const term = actionPollSearchTerm.trim().toLowerCase();
+                filtered = filtered.filter(choice =>
+                    (choice.fields.ChoiceText || "").toLowerCase().includes(term)
+                );
+            }
+            if (filtered.length === 0) {
+                return `<div class="poll-no-choices">No options in this category.</div>`;
+            }
+            return `
+                <div class="poll-cards-grid">
+                    ${filtered.map(choice => {
+                        const choiceText = choice.fields.ChoiceText || "Choice text missing";
+                        const cost = choice.fields.Cost || "N/A";
+                        const time = choice.fields.Time || "N/A";
+                        const social = choice.fields.SocialCapital || "N/A";
+                        return `
+                            <div class="poll-card" onclick="toggleSelection(this)" data-choice-id="${choice.id}">
+                                <div class="poll-text">${choiceText}</div>
+                                <div class="poll-details">
+                                    <span class="poll-detail">Cost: ${cost}</span>
+                                    <span class="poll-detail">Time: ${time}</span>
+                                    <span class="poll-detail">Social: ${social}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `;
         }
 
         // ========================================================================
@@ -918,9 +1088,10 @@ These values represent relative strengths and weaknesses. Consider how these fac
         }
 
         async function nextScene() {
-            currentSceneIndex++;
-            console.log("Advancing to scene", currentSceneIndex);
-            await renderScene();
+            if (currentSceneIndex < totalScenes - 1) {
+                currentSceneIndex++;
+                await renderScene();
+            }
         }
 
         async function prevScene() {
@@ -936,28 +1107,46 @@ These values represent relative strengths and weaknesses. Consider how these fac
         async function fetchInitialSceneList() {
             const { BASE_ID, SCENES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
             const headers = { Authorization: `Bearer ${API_TOKEN}` };
-            const url = `https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}?sort%5B0%5D%5Bfield%5D=SceneID&sort%5B0%5D%5Bdirection%5D=asc`;
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${SCENES_TABLE_ID}`;
             try {
                 const response = await fetch(url, { headers });
                 const data = await response.json();
-                if (!data.records || data.records.length === 0) {
-                    totalScenes = 1;
-                    return;
+                // Only keep records with a valid SceneID (not Scene_ID)
+                sceneList = (data.records || [])
+                    .filter(r => r.fields && typeof r.fields.SceneID !== "undefined" && String(r.fields.SceneID).trim() !== "");
+                if (sceneList.length === 0) {
+                    totalScenes = 0;
+                    throw new Error("No scenes with a valid SceneID found in Airtable.");
                 }
-                totalScenes = data.records.length;
+                // Natural sort by SceneID (alphanumeric, numbers sorted numerically)
+                sceneList.sort((a, b) => {
+                    const aID = String(a.fields.SceneID);
+                    const bID = String(b.fields.SceneID);
+                    return aID.localeCompare(bID, undefined, { numeric: true, sensitivity: 'base' });
+                });
+                totalScenes = sceneList.length;
             } catch (error) {
                 console.error("Error fetching scene list:", error);
+                sceneList = [];
+                totalScenes = 0;
                 throw error;
             }
         }
 
         async function initializeGame() {
             console.log("Initializing Game...");
+            gameStartTime = Date.now(); // Set game start time
             try {
                 await fetchInitialSceneList();
+                if (sceneList.length === 0) {
+                    document.getElementById("sceneContainer").innerHTML = `<p style="color:red;">No scenes found in Airtable. Please check your data.</p>`;
+                    return;
+                }
             } catch (err) {
                 console.error("Scene list error. Using default totalScenes.");
                 totalScenes = 40;
+                document.getElementById("sceneContainer").innerHTML = `<p style="color:red;">Error loading scenes: ${err.message}</p>`;
+                return;
             }
             await renderScene();
         }
@@ -1224,29 +1413,24 @@ These values represent relative strengths and weaknesses. Consider how these fac
                 pollChoicesData[0].fields.ActionType &&
                 pollChoicesData[0].fields.ActionType.toLowerCase() === "action"
             ) {
-                // Render as selectable cards with a "Finished" button for multiple selection.
-                const pollHtml = pollChoicesData
-                    .filter(choice => evaluateCondition(choice.fields.ConditionLogic))
-                    .map(choice => {
-                        const choiceText = choice.fields.ChoiceText || "Choice text missing";
-                        const cost = choice.fields.Cost || "N/A";
-                        const time = choice.fields.Time || "N/A";
-                        const social = choice.fields.SocialCapital || "N/A";
-                        return `
-                            <div class="poll-card" onclick="toggleSelection(this)" data-choice-id="${choice.id}">
-                                <div class="poll-text">${choiceText}</div>
-                                <div class="poll-details">
-                                    <span class="poll-detail">Cost: ${cost}</span>
-                                    <span class="poll-detail">Time: ${time}</span>
-                                    <span class="poll-detail">Social: ${social}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join("");
-                return `<form id="pollForm">
-                            ${pollHtml}
-                            <button type="button" class="poll-finished" onclick="submitPoll(event)">Finished</button>
-                        </form>`;
+                // --- NEW: Action Poll Store by Category ---
+                // Save for re-rendering on category change
+                window.currentActionPollChoices = pollChoicesData;
+                const categories = getActionPollCategories(pollChoicesData);
+                // Default to first category if not set
+                if (!selectedActionCategory || !categories.includes(selectedActionCategory)) {
+                    selectedActionCategory = categories[0];
+                }
+                return `
+                    <form id="pollForm">
+                        ${renderActionCategoryNav(categories)}
+                        ${renderActionPollSearchBar()}
+                        <div id="actionPollCardsArea">
+                            ${renderActionPollCards(pollChoicesData, selectedActionCategory)}
+                        </div>
+                        <button type="button" class="poll-finished" onclick="submitPoll(event)">Finished</button>
+                    </form>
+                `;
             } else {
                 // Default: Render as radio buttons with "Submit Response" button.
                 const pollHtml = pollChoicesData
@@ -1273,3 +1457,4 @@ These values represent relative strengths and weaknesses. Consider how these fac
     </script>
 </body>
 </html>
+``` 

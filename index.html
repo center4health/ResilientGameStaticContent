@@ -177,12 +177,12 @@
         }
         .nav-buttons {
             position: absolute;
-            top: 18px;
-            left: 0;
-            right: 0;
-            width: 100%;
+            bottom: 20px; /* Changed from top to bottom */
+            right: 20px; /* Added right position */
+            left: auto; /* Remove left positioning */
+            width: auto; /* Changed from 100% to auto */
             display: flex;
-            justify-content: center; /* Change to center instead of space-between */
+            justify-content: flex-end; /* Changed from center to flex-end */
             pointer-events: none;
             z-index: 20;
             background: none;
@@ -232,7 +232,7 @@
                 margin: 0 2px;
             }
             .nav-buttons {
-                top: 8px;
+                bottom: 8px;
             }
             .card {
                 width: 100vw;
@@ -398,11 +398,11 @@
 <body>
     <div class="container">
         <div class="card" id="sceneContainer">
+            Loading Game...
             <div class="nav-buttons">
                 <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
                 <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
             </div>
-            Loading Game...
         </div>
     </div>
 
@@ -805,13 +805,20 @@ These values represent relative strengths and weaknesses. Consider how these fac
             if (filtered.length === 0) {
                 return `<div class="poll-no-choices">No options in this category.</div>`;
             }
+            
+            // Log the field names from the first item to help identify the correct field
+            if (filtered.length > 0) {
+                console.log("Available fields in poll choice:", Object.keys(filtered[0].fields));
+            }
+            
             return `
                 <div class="poll-cards-grid">
                     ${filtered.map(choice => {
                         const choiceText = choice.fields.ChoiceText || "Choice text missing";
                         const cost = choice.fields.Cost || "N/A";
                         const time = choice.fields.Time || "N/A";
-                        const social = choice.fields.SocialCapital || "N/A";
+                        const social = choice.fields.SocialCost || "N/A"; // Specifically use SocialCost field
+                        
                         return `
                             <div class="poll-card" onclick="toggleSelection(this)" data-choice-id="${choice.id}">
                                 <div class="poll-text">${choiceText}</div>
@@ -880,10 +887,6 @@ These values represent relative strengths and weaknesses. Consider how these fac
                                               </div>`;
                 }
                 container.innerHTML = `
-                    <div class="nav-buttons">
-                        <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
-                        <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
-                    </div>
                     ${renderMedia(scene)}
                     <div class="media-header-area" style="padding-bottom: 10px;">
                         ${headerHtml}
@@ -893,6 +896,10 @@ These values represent relative strengths and weaknesses. Consider how these fac
                         <div class="scene-title">${processedSceneTitle}</div>
                         <div class="scene-content">${processedSceneContent}</div>
                         ${sunburstHtml || ""}
+                    </div>
+                    <div class="nav-buttons">
+                        <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
+                        <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
                     </div>
                 `;
                 updateNavButtons();

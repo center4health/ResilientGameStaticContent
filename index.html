@@ -23,17 +23,17 @@
             align-items: center; 
             justify-content: center; 
             width: 100vw; 
-            height: calc(100vh - 70px); 
-            padding: 20px; 
+            height: 100vh; /* Remove -70px, use full height */
+            padding: 10px; /* Reduce padding */
         }
         .card { 
             background: #161b22; 
             box-shadow: 0 8px 24px rgba(0,0,0,0.4); 
             border: 1px solid #30363d; 
             border-radius: 8px; 
-            width: 100%; 
-            max-width: 1200px; 
-            height: 100%; 
+            width: 98vw; /* Increase width */
+            max-width: 1400px; /* Increase max width */
+            height: 98vh; /* Increase height */
             padding: 0; 
             position: relative; 
             overflow: hidden; 
@@ -51,17 +51,17 @@
         .media-header-area > * { pointer-events: auto; }
         .content-overlay { 
             position: absolute; 
-            bottom: 70px; /* CHANGED: Stop the overlay above the fixed nav-buttons */
+            bottom: 20px; /* Reduce from 70px to 20px */
             left: 0; 
             right: 0; 
             z-index: 1; 
             background-color: rgba(22,27,34,0.9); 
             border-top: 1px solid #30363d; 
             color: #c9d1d9; 
-            padding: 20px 30px; 
-            max-height: 45%; 
+            padding: 16px 20px; /* Reduce padding */
+            max-height: 50%; /* Slightly increase max height */
             overflow-y: auto; 
-            padding-bottom: 70px; /* ADDED: Ensure content stops above bottom nav-buttons */
+            padding-bottom: 20px; /* Reduce from 70px */
         }
         .content-overlay::-webkit-scrollbar { width: 6px; }
         .content-overlay::-webkit-scrollbar-thumb { 
@@ -175,38 +175,74 @@
             width: 100% !important; 
             height: 100% !important; 
         }
-        .nav-buttons { 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            width: 100%; 
-            text-align: center; 
-            background-color: #0d1117; 
-            padding: 10px 0 15px 0; 
-            border-top: 1px solid #30363d; 
-            z-index: 10; 
+        .nav-buttons {
+            position: absolute;
+            top: 18px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center; /* Change to center instead of space-between */
+            pointer-events: none;
+            z-index: 20;
+            background: none;
+            border: none;
+            padding: 0;
         }
-        button { 
-            padding: 10px 18px; 
-            margin: 5px 10px; 
-            font-size: 1em; 
-            font-weight: 500; 
-            background: #21262d; 
-            color: #c9d1d9; 
-            border: 1px solid #30363d; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            transition: background-color 0.2s ease, border-color 0.2s ease; 
+        .nav-btn {
+            pointer-events: auto;
+            min-width: 0;
+            padding: 2.5px 7px; /* 50% smaller */
+            font-size: 0.7em;   /* 50% smaller */
+            font-weight: 500;
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+            margin: 0 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         }
-        button:hover:not(:disabled) { 
-            background: #30363d; 
-            border-color: #8b949e; 
+        .nav-btn:disabled {
+            background: #161b22;
+            color: #444c56;
+            border-color: #30363d;
+            cursor: not-allowed;
+            opacity: 0.7;
         }
-        button:disabled { 
-            background: #161b22; 
-            color: #444c56; 
-            border-color: #30363d; 
-            cursor: not-allowed; 
+        .nav-btn:hover:not(:disabled) {
+            background: #30363d;
+            border-color: #8b949e;
+        }
+        /* Remove old bottom nav-buttons space */
+        body > .nav-buttons {
+            display: none; /* Hide the external nav buttons completely */
+        }
+        @media (max-width: 900px) {
+            .card {
+                max-width: 100vw;
+                width: 100vw;
+            }
+        }
+        @media (max-width: 600px) {
+            .nav-btn {
+                font-size: 0.6em;
+                padding: 2px 5px;
+                margin: 0 2px;
+            }
+            .nav-buttons {
+                top: 8px;
+            }
+            .card {
+                width: 100vw;
+                max-width: 100vw;
+                height: 100vh;
+            }
+            .content-overlay {
+                padding: 10px 6px;
+                max-height: 60%;
+            }
         }
         .card-background-media {
             position: absolute; 
@@ -361,11 +397,13 @@
 </head>
 <body>
     <div class="container">
-        <div class="card" id="sceneContainer">Loading Game...</div>
-    </div>
-    <div class="nav-buttons">
-        <button id="prevButton" onclick="prevScene()" disabled>Previous</button>
-        <button id="nextButton" onclick="nextScene()">Next</button>
+        <div class="card" id="sceneContainer">
+            <div class="nav-buttons">
+                <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
+                <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
+            </div>
+            Loading Game...
+        </div>
     </div>
 
     <script>
@@ -516,8 +554,10 @@
         function updateNavButtons() {
             const prevButton = document.getElementById("prevButton");
             const nextButton = document.getElementById("nextButton");
-            prevButton.disabled = currentSceneIndex === 0;
-            nextButton.disabled = currentSceneIndex >= totalScenes - 1;
+            if (prevButton && nextButton) {
+                prevButton.disabled = currentSceneIndex === 0;
+                nextButton.disabled = currentSceneIndex >= totalScenes - 1;
+            }
         }
 
         // ADD: New helper function "renderHeader" before its first use in renderScene
@@ -840,6 +880,10 @@ These values represent relative strengths and weaknesses. Consider how these fac
                                               </div>`;
                 }
                 container.innerHTML = `
+                    <div class="nav-buttons">
+                        <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
+                        <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
+                    </div>
                     ${renderMedia(scene)}
                     <div class="media-header-area" style="padding-bottom: 10px;">
                         ${headerHtml}
@@ -1457,4 +1501,3 @@ These values represent relative strengths and weaknesses. Consider how these fac
     </script>
 </body>
 </html>
-``` 

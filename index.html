@@ -456,6 +456,46 @@
         .poll-search-bar:focus {
             outline: 2px solid #2ea043;
         }
+
+        /* Add styles for permission messages */
+        .permission-message {
+            margin: 20px 0;
+            padding: 12px 15px;
+            background-color: rgba(248, 81, 73, 0.1);
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #f85149;
+            text-align: center;
+        }
+        
+        .role-switcher {
+            position: absolute;
+            top: 10px;
+            right: 70px;
+            z-index: 25;
+            display: flex;
+            gap: 5px;
+            font-size: 0.7em;
+            background-color: rgba(22,27,34,0.9);
+            padding: 5px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .role-btn {
+            padding: 2px 5px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            color: #c9d1d9;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        
+        .role-btn.active {
+            background-color: #2ea043;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -515,6 +555,9 @@
 
         // Add global for search
         let actionPollSearchTerm = "";
+
+        // Add user role management to global state
+        let currentUserRole = "admin"; // Default for testing: "player", "captain", or "admin"
 
         // ========================================================================
         // == 2. HELPER FUNCTIONS ==
@@ -897,6 +940,45 @@ These values represent relative strengths and weaknesses. Consider how these fac
             `;
         }
 
+        // Function to check if user can submit polls based on their role
+        function canUserSubmitPoll(pollType) {
+            switch(currentUserRole) {
+                case "admin":
+                    return true; // Admin can submit all polls
+                case "captain":
+                    return true; // Team captains can submit all polls
+                case "player":
+                    return pollType !== "action"; // Players can submit regular polls but not action polls
+                default:
+                    return false; // Unknown roles have no permissions
+            }
+        }
+
+        // Function to set user role (will be replaced with Django auth later)
+        function setUserRole(role) {
+            if (["player", "captain", "admin"].includes(role)) {
+                currentUserRole = role;
+                console.log(`User role set to: ${role}`);
+                
+                // Update UI to show active role
+                document.querySelectorAll('.role-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.role === role);
+                });
+                
+                // Re-render scene to update permissions if we're on a poll
+                if (sceneDataCache[currentSceneIndex] && 
+                    sceneDataCache[currentSceneIndex].pollChoicesData && 
+                    sceneDataCache[currentSceneIndex].pollChoicesData.length > 0) {
+                    renderScene();
+                }
+            } else {
+                console.error(`Invalid role: ${role}. Must be "player", "captain", or "admin".`);
+            }
+        }
+
+        // Expose to global scope for testing
+        window.setUserRole = setUserRole;
+
         // ========================================================================
         // == 3. CORE RENDERING FUNCTIONS ==
         // ========================================================================
@@ -949,6 +1031,22 @@ These values represent relative strengths and weaknesses. Consider how these fac
                                                   </div>
                                               </div>`;
                 }
+
+                // Add role switcher to the UI for testing
+                const roleSwitcherHtml = `
+                    <div class="role-switcher">
+                        <button class="role-btn ${currentUserRole === 'player' ? 'active' : ''}" 
+                                data-role="player" 
+                                onclick="setUserRole('player')">Player</button>
+                        <button class="role-btn ${currentUserRole === 'captain' ? 'active' : ''}" 
+                                data-role="captain" 
+                                onclick="setUserRole('captain')">Captain</button>
+                        <button class="role-btn ${currentUserRole === 'admin' ? 'active' : ''}" 
+                                data-role="admin" 
+                                onclick="setUserRole('admin')">Admin</button>
+                    </div>
+                `;
+
                 container.innerHTML = `
                     ${renderMedia(scene)}
                     <div class="media-header-area" style="padding-bottom: 10px;">
@@ -964,6 +1062,7 @@ These values represent relative strengths and weaknesses. Consider how these fac
                         <button id="prevButton" class="nav-btn" onclick="prevScene()" disabled>&larr; Prev</button>
                         <button id="nextButton" class="nav-btn" onclick="nextScene()">&rarr; Next</button>
                     </div>
+                    ${roleSwitcherHtml}
                 `;
                 updateNavButtons();
                 if (scene.TimerSeconds && scene.TimerSeconds > 0) {
@@ -985,6 +1084,20 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         async function submitPoll(event) {
             if (event) event.preventDefault();
+            
+            // Get poll type
+            const isActionPoll = sceneDataCache[currentSceneIndex].pollChoicesData.length > 0 && 
+                                sceneDataCache[currentSceneIndex].pollChoicesData[0].fields.ActionType &&
+                                sceneDataCache[currentSceneIndex].pollChoicesData[0].fields.ActionType.toLowerCase() === "action";
+            
+            const pollType = isActionPoll ? "action" : "regular";
+            
+            // Check permissions
+            if (!canUserSubmitPoll(pollType)) {
+                console.error("Permission denied: User cannot submit this poll type.");
+                return;
+            }
+
             if (pollSubmitted) return; // Prevent duplicate submissions
             pollSubmitted = true;
             clearInterval(window.countdownInterval);  // Ensure timer is cleared
@@ -1528,19 +1641,21 @@ These values represent relative strengths and weaknesses. Consider how these fac
         }
 
         function renderPollOptions(pollChoicesData) {
-            if (
-                pollChoicesData.length > 0 &&
-                pollChoicesData[0].fields.ActionType &&
-                pollChoicesData[0].fields.ActionType.toLowerCase() === "action"
-            ) {
-                // --- NEW: Action Poll Store by Category ---
-                // Save for re-rendering on category change
+            const isActionPoll = pollChoicesData.length > 0 && 
+                              pollChoicesData[0].fields.ActionType &&
+                              pollChoicesData[0].fields.ActionType.toLowerCase() === "action";
+            
+            if (isActionPoll) {
+                // Action poll handling
                 window.currentActionPollChoices = pollChoicesData;
                 const categories = getActionPollCategories(pollChoicesData);
-                // Default to first category if not set
                 if (!selectedActionCategory || !categories.includes(selectedActionCategory)) {
                     selectedActionCategory = categories[0];
                 }
+                
+                // Check permissions for action polls
+                const canSubmit = canUserSubmitPoll("action");
+                
                 return `
                     <form id="pollForm">
                         ${renderActionCategoryNav(categories)}
@@ -1548,25 +1663,33 @@ These values represent relative strengths and weaknesses. Consider how these fac
                         <div id="actionPollCardsArea">
                             ${renderActionPollCards(pollChoicesData, selectedActionCategory)}
                         </div>
-                        <button type="button" class="poll-finished" onclick="submitPoll(event)">Finished</button>
+                        ${canSubmit 
+                            ? `<button type="button" class="poll-submit" onclick="submitPoll(event)">Finished</button>` 
+                            : `<div class="permission-message">Only team captains and admins can submit actions.</div>`
+                        }
                     </form>
                 `;
             } else {
-                // Default: Render as radio buttons with "Submit Response" button.
+                // Regular poll handling
+                const canSubmit = canUserSubmitPoll("regular");
                 const pollHtml = pollChoicesData
                     .filter(choice => evaluateCondition(choice.fields.ConditionLogic))
                     .map((choice, idx) => {
                         const choiceText = choice.fields.ChoiceText || "Choice text missing";
                         return `
                             <div class="poll-option">
-                                <input type="radio" id="choice${idx}" name="pollChoice" value="${choice.id}">
+                                <input type="radio" id="choice${idx}" name="pollChoice" value="${choice.id}" ${!canSubmit ? 'disabled' : ''}>
                                 <label for="choice${idx}">${choiceText}</label>
                             </div>
                         `;
                     }).join("");
+                
                 return `<form id="pollForm">
                             ${pollHtml}
-                            <button type="button" class="poll-submit" onclick="submitPoll(event)">Submit Response</button>
+                            ${canSubmit 
+                                ? `<button type="button" class="poll-submit" onclick="submitPoll(event)">Submit Response</button>`
+                                : `<div class="permission-message">You do not have permission to submit this poll.</div>`
+                            }
                         </form>`;
             }
         }

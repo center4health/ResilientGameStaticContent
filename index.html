@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Resilient Shield Simulation Game</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -559,6 +559,9 @@
         // Add user role management to global state
         let currentUserRole = "admin"; // Default for testing: "player", "captain", or "admin"
 
+        // ADD: Global array to accumulate SQL statements
+        let pollSqlStatements = [];
+
         // ========================================================================
         // == 2. HELPER FUNCTIONS ==
         // ========================================================================
@@ -820,6 +823,7 @@
                 }
             } catch (error) {
                 console.error("Error in writeToAirtable:", error);
+                throw error;
             }
         }
 
@@ -1082,32 +1086,90 @@ These values represent relative strengths and weaknesses. Consider how these fac
             }
         }
 
+        // Add after downloadPollSql()
+        async function postPollResponseToApi({ gameId, teamId, modelParameter, simulationDate, operator, value }) {
+            const url = "https://game.resilientgame.org/api/simulation-parameters/update_with_operator/";
+            const payload = {
+                game_id: gameId || "",
+                team_id: teamId || "",
+                "Model Parameter": modelParameter || "",
+                simulation_date: simulationDate || "",
+                operator: operator || "",
+                value: value !== undefined ? value : ""
+            };
+            try {
+                const resp = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    return { success: false, message: `error: ${errText}` };
+                }
+                return { success: true, message: "database updated" };
+            } catch (err) {
+                return { success: false, message: `error: ${err.message}` };
+            }
+        }
+
+        // Fix: Use correct field name "ChangeValue" (capital V) and do not drop any code in submitPoll
+        async function writePollChoiceToAirtable({ modelParam, operator, changeValue, game, team, gameDateTime, response, count }) {
+            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
+            const tableName = "PollChoice";
+            const url = `https://api.airtable.com/v0/${BASE_ID}/${tableName}`;
+            const headers = {
+                "Authorization": `Bearer ${API_TOKEN}`,
+                "Content-Type": "application/json"
+            };
+            // Use exact field names as in Airtable
+            const fields = {};
+            if (modelParam) fields.ModelParameter = modelParam;
+            if (operator) fields.Operator = operator;
+            if (changeValue !== undefined && changeValue !== null && changeValue !== "") {
+                const numVal = Number(changeValue);
+                fields.ChangeValue = !isNaN(numVal) ? numVal : changeValue;
+            }
+            if (game) fields.Game = game;
+            if (team) fields.Team = team;
+            if (gameDateTime) fields.GameDateTime = gameDateTime;
+            if (response) fields.Response = response;
+            if (typeof count === "number" || (typeof count === "string" && count !== "")) fields.Count = count;
+
+            // Debug: Log outgoing payload and headers
+            console.log("Airtable payload:", JSON.stringify({ fields }));
+            console.log("Airtable POST URL:", url);
+            console.log("Airtable headers:", headers);
+
+            try {
+                const res = await fetch(url, {
+                    method: "POST",
+                    headers: headers,
+                    body: JSON.stringify({ fields })
+                });
+                const resText = await res.text();
+                if (!res.ok) {
+                    console.error("Error writing to PollChoice Airtable:", res.status, resText);
+                    if (res.status === 422) {
+                        alert("Airtable error: " + resText);
+                    }
+                } else {
+                    console.log("Airtable write success:", res.status, resText);
+                }
+            } catch (err) {
+                console.error("Error writing to PollChoice Airtable (network):", err);
+            }
+        }
+
         async function submitPoll(event) {
             if (event) event.preventDefault();
-            
-            // Get poll type
-            const isActionPoll = sceneDataCache[currentSceneIndex].pollChoicesData.length > 0 && 
-                                sceneDataCache[currentSceneIndex].pollChoicesData[0].fields.ActionType &&
-                                sceneDataCache[currentSceneIndex].pollChoicesData[0].fields.ActionType.toLowerCase() === "action";
-            
-            const pollType = isActionPoll ? "action" : "regular";
-            
-            // Check permissions
-            if (!canUserSubmitPoll(pollType)) {
-                console.error("Permission denied: User cannot submit this poll type.");
-                return;
-            }
 
-            if (pollSubmitted) return; // Prevent duplicate submissions
-            pollSubmitted = true;
-            clearInterval(window.countdownInterval);  // Ensure timer is cleared
-            const form = document.getElementById("pollForm");
+            const currentSceneFullData = sceneDataCache[currentSceneIndex];
             const submitButton = document.querySelector('.poll-submit');
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.innerText = "Processing...";
-            }
+
+            // === Ensure selectedChoiceIDs is defined ===
             let selectedChoiceIDs = [];
+            const form = document.getElementById("pollForm");
             if (form && form.elements["pollChoice"]) {
                 let pollElems = form.elements["pollChoice"];
                 if (!pollElems.length) { 
@@ -1121,202 +1183,107 @@ These values represent relative strengths and weaknesses. Consider how these fac
                     }
                 });
             }
-            if (selectedChoiceIDs.length === 0) {
-                console.log("No poll option selected, advancing scene.");
-                setTimeout(() => nextScene(), 100); // Added delay to help UI settle
-                pollSubmitted = false;
-                return;
+            if (
+                selectedChoiceIDs.length === 0 &&
+                document.querySelectorAll('.poll-card.selected').length > 0
+            ) {
+                selectedChoiceIDs = Array.from(document.querySelectorAll('.poll-card.selected'))
+                    .map(card => card.getAttribute('data-choice-id'))
+                    .filter(Boolean);
             }
-            console.log("Submit Response clicked. Selected IDs:", selectedChoiceIDs);
-            const currentSceneFullData = sceneDataCache[currentSceneIndex];
-            if (!currentSceneFullData || !currentSceneFullData.pollChoicesData) {
-                console.error("Cannot process poll: Missing cached scene/poll data.");
-                if (submitButton) submitButton.innerText = "Error";
-                pollSubmitted = false;
-                return;
-            }
+
+            // === Ensure choiceDataLookup is defined ===
             const choiceDataLookup = {};
-            currentSceneFullData.pollChoicesData.forEach(choice => {
-                choiceDataLookup[choice.id] = choice;
-            });
-            try {
-                for (const choiceID of selectedChoiceIDs) {
-                    const choiceData = choiceDataLookup[choiceID];
-                    if (!choiceData) {
-                        console.error("Invalid choice ID submitted:", choiceID);
-                        throw new Error("Invalid poll option selected.");
-                    }
-                    if (!evaluateCondition(choiceData.fields.ConditionLogic)) {
-                        console.error(`The selected option "${choiceData.fields.ChoiceText}" is no longer valid.`);
-                        throw new Error("Poll option no longer valid.");
-                    }
-                    await processPollSubmission(choiceData, currentSceneFullData.sceneData.fields.PollID);
-                }
-                if (submitButton) {
-                    submitButton.innerText = "Response Submitted";
-                }
-                console.log("Poll submission complete. Advancing scene.");
-                setTimeout(() => nextScene(), 100);
-            } catch (error) {
-                console.error("Error during poll submission:", error);
-                if (submitButton) {
-                    submitButton.innerText = "Error";
-                }
-                // Advance scene even if an error occurs
-                setTimeout(() => nextScene(), 100);
-            } finally {
-                pollSubmitted = false;
-            }
-        }
-
-        // New helper function to process individual poll submissions based on target table.
-        async function processPollSubmission(choiceRecord, pollID) {
-            const modelParameter = choiceRecord.fields.ModelParameter;
-            const operator = choiceRecord.fields.Operator; // e.g. "+" or "-" (if provided)
-            if (modelParameter) {
-                const parts = modelParameter.split(".");
-                if (parts.length >= 2) {
-                    const tableName = parts[0].trim().toLowerCase();
-                    const fieldName = parts.slice(1).join(".").trim();
-                    if (tableName === "teams") {
-                        // Mapping for Teams fields update
-                        const teamFieldMapping = {
-                            "System Finance": { container: "finances", key: "system" },
-                            "Social Capital": { container: "socialCapital" },
-                            "Human Healthcare Capacity": { container: "capacities", key: "publicHealthCapacity" },
-                            "Testing Capacity": { container: "capacities", key: "testingCapacity" },
-                            "Science Capacity": { container: "capacities", key: "scienceCapacity" },
-                            "Animal Surveillance Capacity": { container: "capacities", key: "animalSurveillanceCapacity" }
-                        };
-                        const mapping = teamFieldMapping[fieldName];
-                        if (mapping) {
-                            let inc = parseInt(choiceRecord.fields.UpdateIncrement || "1", 10);
-                            if (operator && operator.trim() === "-") {
-                                inc = -inc;
-                            }
-                            if (mapping.container === "finances") {
-                                currentTeam.finances[mapping.key] = (parseInt(currentTeam.finances[mapping.key] || "0", 10) + inc);
-                            } else if (mapping.container === "capacities") {
-                                currentTeam.capacities[mapping.key] = (parseInt(currentTeam.capacities[mapping.key] || "0", 10) + inc);
-                            } else if (mapping.container === "socialCapital") {
-                                currentTeam.socialCapital = (parseInt(currentTeam.socialCapital || "0", 10) + inc);
-                            }
-                            await updatePollResponses([choiceRecord.id], pollID);
-                            await writeTeamToAirtable();
-                        } else {
-                            console.error("Mapping not found for field:", fieldName);
-                            await updatePollResponses([choiceRecord.id], pollID);
-                        }
-                    } else if (tableName === "configgame") {
-                        let inc = parseInt(choiceRecord.fields.UpdateIncrement || "1", 10);
-                        if (operator && operator.trim() === "-") {
-                            inc = -inc;
-                        }
-                        try {
-                            await writeToGameConfig(fieldName, inc);
-                            await updatePollResponses([choiceRecord.id], pollID);
-                        } catch (error) {
-                            console.error("Error updating ConfigGame:", error);
-                            await updatePollResponses([choiceRecord.id], pollID);
-                        }
-                    } else {
-                        await updatePollResponses([choiceRecord.id], pollID);
-                    }
-                } else {
-                    await updatePollResponses([choiceRecord.id], pollID);
-                }
-            } else {
-                await updatePollResponses([choiceRecord.id], pollID);
-            }
-        }
-
-        // Fix the missing writeToGameConfig function
-        async function writeToGameConfig(fieldName, increment) {
-            const { BASE_ID, CONFIG_GAME_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
-            try {
-                // Find GameConfig record for the current team using a filter on the 'Team' field
-                const filter = encodeURIComponent(`{Team}='${currentTeam.name}'`);
-                const urlGet = `https://api.airtable.com/v0/${BASE_ID}/${CONFIG_GAME_TABLE_ID}?filterByFormula=${filter}`;
-                const response = await fetch(urlGet, { headers });
-                if (!response.ok) throw new Error(`Failed to fetch GameConfig data: ${response.statusText}`);
-                const data = await response.json();
-                if (data.records && data.records.length > 0) {
-                    const recordId = data.records[0].id;
-                    const currentVal = parseInt(data.records[0].fields[fieldName] || "0", 10);
-                    const newVal = currentVal + increment;
-                    const body = JSON.stringify({
-                        fields: { [fieldName]: newVal }
-                    });
-                    const urlPatch = `https://api.airtable.com/v0/${BASE_ID}/${CONFIG_GAME_TABLE_ID}/${recordId}`;
-                    const patchResponse = await fetch(urlPatch, { method: "PATCH", headers, body });
-                    if (!patchResponse.ok) {
-                        console.error("Error updating GameConfig for", fieldName, patchResponse.statusText);
-                    } else {
-                        console.log("GameConfig updated successfully for", fieldName, newVal);
-                    }
-                } else {
-                    console.warn("No GameConfig record found for team", currentTeam.name);
-                }
-            } catch (error) {
-                console.error("Error in writeToGameConfig:", error);
-                throw error; 
-            }
-        }
-
-        async function updatePollResponses(selectedChoiceIDs, pollID) {
-            const { BASE_ID, POLL_RESPONSES_TABLE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
-            const payload = {
-                records: selectedChoiceIDs.map(choiceId => ({
-                    fields: {
-                        PollID: pollID,
-                        ChoiceID: choiceId,
-                        TeamID: currentTeam.name,
-                        ResponseCount: 1
-                    }
-                }))
-            };
-            console.log("Sending PollResponses payload:", JSON.stringify(payload));
-            const url = `https://api.airtable.com/v0/${BASE_ID}/${POLL_RESPONSES_TABLE_ID}`;
-            const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
-            if (!response.ok) {
-                const text = await response.text();
-                console.error("Error updating PollResponses:", text);
-                throw new Error(`Failed to update PollResponses: ${response.statusText}`);
-            }
-            const data = await response.json();
-            console.log("PollResponses updated successfully:", data);
-        }
-
-        async function writeToAirtable(tableName, parameter, value) {
-            const { BASE_ID, API_TOKEN } = AIRTABLE_CONFIG;
-            const headers = { Authorization: `Bearer ${API_TOKEN}`, "Content-Type": "application/json" };
-            const record = {
-                fields: {
-                    Parameter: parameter,
-                    Value: value,
-                    TeamID: currentTeam.name
-                }
-            };
-            console.log(`Writing to ${tableName} with payload:`, JSON.stringify({ records: [record] }));
-            const url = `https://api.airtable.com/v0/${BASE_ID}/${tableName}`;
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({ records: [record] })
+            if (currentSceneFullData && currentSceneFullData.pollChoicesData) {
+                currentSceneFullData.pollChoicesData.forEach(choice => {
+                    choiceDataLookup[choice.id] = choice;
                 });
-                const text = await response.text();
-                console.log(`Raw response from ${tableName} POST:`, text);
-                if (!response.ok) {
-                    console.error(`Error writing to ${tableName}:`, text);
-                    throw new Error(`Failed to write to ${tableName}: ${response.status} ${response.statusText}`);
+            }
+
+            try {
+                const teamName = currentTeam?.name || "";
+                const gameDateTime = currentSceneFullData.sceneData.fields.GameDateTime || "";
+                const gameId = ""; // Set if you have a game/session ID
+                let apiMessage = "";
+                for (const choiceID of selectedChoiceIDs) {
+                    const choice = choiceDataLookup[choiceID];
+                    if (!choice) continue;
+                    const modelParam = (choice.fields && choice.fields.ModelParameter !== undefined && choice.fields.ModelParameter !== null)
+                        ? String(choice.fields.ModelParameter)
+                        : "";
+                    const operator = (choice.fields && choice.fields.Operator !== undefined && choice.fields.Operator !== null)
+                        ? String(choice.fields.Operator)
+                        : "";
+
+                    // DEBUG: Log the full fields object to inspect available keys
+                    console.log("DEBUG choice.fields:", choice.fields);
+
+                    // Try to get ChangeValue from multiple possible field names
+                    let changeValue = "";
+                    // 1. Try UpdateIncrement (your original field)
+                    if (choice.fields && choice.fields.UpdateIncrement !== undefined && choice.fields.UpdateIncrement !== null && String(choice.fields.UpdateIncrement).trim() !== "") {
+                        changeValue = String(choice.fields.UpdateIncrement);
+                    }
+                    // 2. Try ChangeValue (exact case)
+                    else if (choice.fields && choice.fields.ChangeValue !== undefined && choice.fields.ChangeValue !== null && String(choice.fields.ChangeValue).trim() !== "") {
+                        changeValue = String(choice.fields.ChangeValue);
+                    }
+                    // 3. Try Changevalue (common Airtable typo)
+                    else if (choice.fields && choice.fields.Changevalue !== undefined && choice.fields.Changevalue !== null && String(choice.fields.Changevalue).trim() !== "") {
+                        changeValue = String(choice.fields.Changevalue);
+                    }
+                    // 4. Try to find a field that matches case-insensitively
+                    else if (choice.fields) {
+                        for (const key in choice.fields) {
+                            if (key.toLowerCase() === "changevalue" && String(choice.fields[key]).trim() !== "") {
+                                changeValue = String(choice.fields[key]);
+                                break;
+                            }
+                        }
+                    }
+                    // 5. As a last resort, try to extract a number from ChoiceText (if present)
+                    if (!changeValue && choice.fields && typeof choice.fields.ChoiceText === "string") {
+                        const match = choice.fields.ChoiceText.match(/([-+]?\d*\.?\d+)/);
+                        if (match) changeValue = match[1];
+                    }
+
+                    // DEBUG: Log the resolved changeValue and all field keys
+                    console.log("DEBUG resolved changeValue:", changeValue, "All keys:", Object.keys(choice.fields));
+
+                    // === Write to PollChoice Airtable ===
+                    const isActionPoll = choice.fields.ActionType && choice.fields.ActionType.toLowerCase() === "action";
+                    await writePollChoiceToAirtable({
+                        modelParam,
+                        operator,
+                        changeValue, // Always pass, even if empty
+                        game: gameId,
+                        team: teamName,
+                        gameDateTime,
+                        response: !isActionPoll ? (choice.fields.ChoiceText || "") : undefined,
+                        count: !isActionPoll ? 1 : undefined
+                    });
+
+                    // === POST to API ===
+                    const apiResult = await postPollResponseToApi({
+                        gameId: "", // Set if you have a game/session ID
+                        teamId: teamName,
+                        modelParameter: modelParam,
+                        simulationDate: (gameDateTime || "").split("T")[0],
+                        operator: operator,
+                        value: changeValue
+                    });
+                    apiMessage = apiResult.success
+                        ? "Response submitted and database updated"
+                        : `Response submitted, ${apiResult.message}`;
                 }
-                console.log(`Successfully wrote to ${tableName}:`, parameter, value);
-            } catch (error) {
-                console.error(`Error writing to ${tableName}:`, error);
-                throw error;
+                downloadPollSql();
+                // Show message to user
+                if (submitButton) {
+                    submitButton.innerText = apiMessage;
+                }
+            } catch (err) {
+                console.error("Error saving poll submission to SQL or API:", err);
+                if (submitButton) submitButton.innerText = `Response submitted, error: ${err.message}`;
             }
         }
 
@@ -1696,6 +1663,23 @@ These values represent relative strengths and weaknesses. Consider how these fac
 
         function toggleSelection(cardEl) {
             cardEl.classList.toggle("selected");
+        }
+
+        // Add this helper before submitPoll or anywhere in a <script> block
+        function downloadPollSql() {
+            if (!pollSqlStatements || !pollSqlStatements.length) return;
+            const sqlContent = pollSqlStatements.join("\n");
+            const blob = new Blob([sqlContent], { type: "text/sql" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "PollOutput.sql";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
         }
     </script>
 </body>
